@@ -57,4 +57,23 @@ func TestSQLiteRepo(t *testing.T) {
 	if err != nil || usageAfter != 1500 {
 		t.Errorf("expected 1500 usage, got %d, err: %v", usageAfter, err)
 	}
+
+	// Test Session Repository Append & Fetch
+	msg := SessionMessage{
+		SessionID: "sess-123",
+		Role:      "user",
+		Content:   "Explain Go channels",
+		Timestamp: time.Now(),
+	}
+	if err := repo.AppendToSession(ctx, "sess-123", msg); err != nil {
+		t.Fatalf("failed to append session message: %v", err)
+	}
+
+	history, err := repo.GetSessionHistory(ctx, "sess-123", 5)
+	if err != nil || len(history) != 1 {
+		t.Fatalf("expected 1 history message, got %d, err: %v", len(history), err)
+	}
+	if history[0].Content != "Explain Go channels" {
+		t.Errorf("unexpected content: %s", history[0].Content)
+	}
 }
