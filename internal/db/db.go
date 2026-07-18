@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -47,12 +48,20 @@ func NewSQLiteRepo(dbPath string) (*SQLiteRepo, error) {
 	}
 
 	repo := &SQLiteRepo{db: db}
-	if err := repo.initTables(); err != nil {
+	if err := RunMigrations(db); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("failed to init tables: %w", err)
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
 	return repo, nil
+}
+
+func NewSQLiteRepoFromEnv() (*SQLiteRepo, error) {
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		dbPath = "camper_vane.db"
+	}
+	return NewSQLiteRepo(dbPath)
 }
 
 func (r *SQLiteRepo) Close() error {
