@@ -7,6 +7,7 @@ import (
 
 	"camper-vane/internal/api"
 	"camper-vane/internal/db"
+	"camper-vane/internal/router"
 )
 
 func main() {
@@ -21,9 +22,10 @@ func main() {
 	}
 	defer repo.Close()
 
+	routerEngine := router.NewRouter(repo, repo)
 	authHandler := api.NewAuthHandler(repo)
 	userHandler := api.NewUserHandler(repo)
-	chatHandler := api.NewChatStreamHandler(repo, repo)
+	chatHandler := api.NewChatStreamHandler(repo, repo, routerEngine)
 
 	mux := http.NewServeMux()
 

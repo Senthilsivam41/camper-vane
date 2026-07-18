@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"camper-vane/internal/db"
+	"camper-vane/internal/router"
 )
 
 func TestChatStreamHandler(t *testing.T) {
@@ -18,7 +19,8 @@ func TestChatStreamHandler(t *testing.T) {
 	}
 	defer repo.Close()
 
-	streamHandler := NewChatStreamHandler(repo, repo)
+	rEngine := router.NewRouter(repo, repo)
+	streamHandler := NewChatStreamHandler(repo, repo, rEngine)
 	authHandler := NewAuthHandler(repo)
 
 	// Register user session

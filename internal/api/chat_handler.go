@@ -8,17 +8,20 @@ import (
 
 	"camper-vane/internal/db"
 	"camper-vane/internal/proxy"
+	"camper-vane/internal/router"
 )
 
 type ChatStreamHandler struct {
 	userRepo    db.UserRepository
 	sessionRepo db.SessionRepository
+	router      *router.Router
 }
 
-func NewChatStreamHandler(userRepo db.UserRepository, sessionRepo db.SessionRepository) *ChatStreamHandler {
+func NewChatStreamHandler(userRepo db.UserRepository, sessionRepo db.SessionRepository, r *router.Router) *ChatStreamHandler {
 	return &ChatStreamHandler{
 		userRepo:    userRepo,
 		sessionRepo: sessionRepo,
+		router:      r,
 	}
 }
 
@@ -29,9 +32,11 @@ type ChatStreamRequest struct {
 }
 
 type MetricsEvent struct {
-	SelectedModel      string `json:"selected_model"`
-	RoutingRationale   string `json:"routing_rationale"`
-	EstimatedCostDelta string `json:"estimated_cost_delta"`
+	SelectedModel      string  `json:"selected_model"`
+	RoutingRationale   string  `json:"routing_rationale"`
+	EstimatedCostDelta string  `json:"estimated_cost_delta"`
+	BudgetThrottled    bool    `json:"budget_throttled"`
+	ComplexityScore    float64 `json:"complexity_score"`
 }
 
 type TextEvent struct {
@@ -76,14 +81,19 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 		req.SessionID = "default-session"
 	}
 
-	if req.Model == "" {
-		req.Model = "gemini-1.5-flash"
-	}
-
-	// 1. Fetch user config
-	userCfg, err := h.userRepo.GetUserConfig(r.Context(), userID)
+	// 1. Evaluate Dual-Tier Routing Decision
+	decision, err := h.router.EvaluateRoute(r.Context(), router.RouteRequest{
+		UserID:         userID,
+		SessionID:      req.SessionID,
+		Prompt:         req.Prompt,
+		RequestedModel: req.Model,
+	})
 	if err != nil {
-		userCfg = &db.UserConfig{DailyTokenCap: 50000, RoutingStrategy: "simple"}
+		decision = &router.RoutingDecision{
+			SelectedModel:      "gemini-1.5-flash",
+			RoutingRationale:   "Default fallback model negotiated.",
+			EstimatedCostDelta: "-$0.0010",
+		}
 	}
 
 	// Set SSE Headers
@@ -92,11 +102,13 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	// 2. Emit `event: metrics`
+	// 2. Emit `event: metrics` with routing insight
 	metrics := MetricsEvent{
-		SelectedModel:      req.Model,
-		RoutingRationale:   fmt.Sprintf("Negotiated downstream model %s under %s strategy.", req.Model, userCfg.RoutingStrategy),
-		EstimatedCostDelta: "-$0.0015",
+		SelectedModel:      decision.SelectedModel,
+		RoutingRationale:   decision.RoutingRationale,
+		EstimatedCostDelta: decision.EstimatedCostDelta,
+		BudgetThrottled:    decision.BudgetThrottled,
+		ComplexityScore:    decision.ComplexityScore,
 	}
 	sendSSEEvent(w, flusher, "metrics", metrics)
 
@@ -109,13 +121,13 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 	})
 
 	// 3. Negotiate provider client and stream text deltas
-	client := proxy.GetProviderClient(req.Model)
+	client := proxy.GetProviderClient(decision.SelectedModel)
 	chunkChan := make(chan proxy.StreamChunk, 100)
 
 	proxyReq := proxy.ChatRequest{
 		SessionID: req.SessionID,
 		Prompt:    req.Prompt,
-		Model:     req.Model,
+		Model:     decision.SelectedModel,
 	}
 
 	go func() {
