@@ -56,7 +56,7 @@ func TestMockClientStream(t *testing.T) {
 		t.Fatalf("expected final chunk with tokens metadata")
 	}
 
-	if finalChunk.InputTokensConsumed <= 0 || finalChunk.OutputTokens <= 0 {
-		t.Errorf("expected positive token metrics, got input=%d output=%d", finalChunk.InputTokensConsumed, finalChunk.OutputTokens)
+	if finalChunk.InputTokensConsumed <= 0 || finalChunk.OutputTokensConsumed <= 0 {
+		t.Errorf("expected positive token metrics, got input=%d output=%d", finalChunk.InputTokensConsumed, finalChunk.OutputTokensConsumed)
 	}
 }

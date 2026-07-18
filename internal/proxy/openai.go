@@ -97,7 +97,7 @@ func (c *OpenAIClient) StreamChat(ctx context.Context, req ChatRequest, chunkCha
 
 	chunkChan <- StreamChunk{
 		InputTokensConsumed: inputTokens,
-		OutputTokens:        outputTokens,
+		OutputTokensConsumed: outputTokens,
 		IsFinal:             true,
 	}
 

@@ -14,7 +14,7 @@ type ChatRequest struct {
 type StreamChunk struct {
 	TextDelta           string `json:"text_delta,omitempty"`
 	InputTokensConsumed int64  `json:"input_tokens_consumed,omitempty"`
-	OutputTokens        int64  `json:"output_tokens_consumed,omitempty"`
+	OutputTokensConsumed int64 `json:"output_tokens_consumed,omitempty"`
 	IsFinal             bool   `json:"is_final,omitempty"`
 	Error               error  `json:"-"`
 }

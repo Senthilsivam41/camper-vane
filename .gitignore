@@ -3,7 +3,7 @@
 *.db-shm
 *.db-wal
 camper_vane.db
-server
+/server
 
 # Dependency directories
 node_modules/

@@ -98,7 +98,7 @@ func (c *AnthropicClient) StreamChat(ctx context.Context, req ChatRequest, chunk
 
 	chunkChan <- StreamChunk{
 		InputTokensConsumed: inputTokens,
-		OutputTokens:        outputTokens,
+		OutputTokensConsumed: outputTokens,
 		IsFinal:             true,
 	}
 

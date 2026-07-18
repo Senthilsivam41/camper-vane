@@ -31,7 +31,7 @@ func (c *MockClient) StreamChat(ctx context.Context, req ChatRequest, chunkChan 
 
 	chunkChan <- StreamChunk{
 		InputTokensConsumed: inputTokens,
-		OutputTokens:        outputTokens,
+		OutputTokensConsumed: outputTokens,
 		IsFinal:             true,
 	}
 
