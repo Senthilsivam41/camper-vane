@@ -8,7 +8,7 @@ export const UserSettings: React.FC = () => {
   const [strategy, setStrategy] = useState<'simple' | 'advanced'>('simple');
   const [preferredModels, setPreferredModels] = useState<string[]>([]);
   const [newModel, setNewModel] = useState<string>('');
-  
+
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
@@ -72,33 +72,54 @@ export const UserSettings: React.FC = () => {
   };
 
   if (loading) {
-    return <div style={styles.card}>Loading preferences...</div>;
+    return (
+      <div style={styles.card} aria-busy="true" aria-live="polite">
+        Loading preferences...
+      </div>
+    );
   }
 
   return (
     <div style={styles.card}>
       <h2 style={styles.heading}>User Preferences & Routing Settings</h2>
-      
-      {errorMsg && <div style={styles.errorAlert}>{errorMsg}</div>}
-      {saveSuccess && <div style={styles.successBadge}>✓ Preferences updated successfully</div>}
 
-      <form onSubmit={handleSave} style={styles.form}>
+      {errorMsg && (
+        <div style={styles.errorAlert} role="alert">
+          ⚠️ {errorMsg}
+        </div>
+      )}
+      {saveSuccess && (
+        <div style={styles.successBadge} role="status" aria-live="polite">
+          ✓ Preferences updated successfully
+        </div>
+      )}
+
+      <form onSubmit={handleSave} style={styles.form} aria-label="User Preferences Form">
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Daily Token Cap:</label>
+          <label htmlFor="daily-cap-input" style={styles.label}>
+            Daily Token Cap:
+          </label>
           <input
+            id="daily-cap-input"
             type="number"
             min="0"
             value={dailyCap}
             onChange={(e) => setDailyCap(Number(e.target.value))}
             style={styles.input}
             required
+            aria-describedby="daily-cap-hint"
           />
-          <small style={styles.hint}>Daily ceiling before Simple Mode enforces low-cost routing.</small>
+          <small id="daily-cap-hint" style={styles.hint}>
+            Daily volumetric ceiling before Simple Mode enforces low-cost routing (≥85% threshold).
+          </small>
         </div>
 
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Optimization Strategy:</label>
+          <label htmlFor="strategy-select" style={styles.label}>
+            Optimization Strategy:
+          </label>
           <select
+            id="strategy-select"
             value={strategy}
             onChange={(e) => setStrategy(e.target.value as 'simple' | 'advanced')}
             style={styles.select}
@@ -109,26 +130,42 @@ export const UserSettings: React.FC = () => {
         </div>
 
         <div style={styles.fieldGroup}>
-          <label style={styles.label}>Preferred Models Order:</label>
-          <div style={styles.modelTagList}>
+          <label id="preferred-models-label" style={styles.label}>
+            Preferred Models Order:
+          </label>
+          <div style={styles.modelTagList} aria-labelledby="preferred-models-label">
             {preferredModels.map((model) => (
               <span key={model} style={styles.tag}>
                 {model}
-                <button type="button" onClick={() => removeModel(model)} style={styles.tagRemoveBtn}>
+                <button
+                  type="button"
+                  onClick={() => removeModel(model)}
+                  style={styles.tagRemoveBtn}
+                  aria-label={`Remove model ${model}`}
+                >
                   ×
                 </button>
               </span>
             ))}
           </div>
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <label htmlFor="add-model-input" className="visually-hidden">
+              Add new model name
+            </label>
             <input
+              id="add-model-input"
               type="text"
               placeholder="e.g. gemini-1.5-flash"
               value={newModel}
               onChange={(e) => setNewModel(e.target.value)}
               style={{ ...styles.input, flex: 1 }}
             />
-            <button type="button" onClick={addModel} style={styles.secBtn}>
+            <button
+              type="button"
+              onClick={addModel}
+              style={styles.secBtn}
+              aria-label="Add model to list"
+            >
               Add Model
             </button>
           </div>
@@ -144,25 +181,24 @@ export const UserSettings: React.FC = () => {
 
 const styles: Record<string, React.CSSProperties> = {
   card: {
-    backgroundColor: '#1e1e2e',
-    color: '#cdd6f4',
+    backgroundColor: 'var(--bg-card)',
+    color: 'var(--text-main)',
     borderRadius: '12px',
     padding: '24px',
     maxWidth: '600px',
     margin: '20px auto',
-    boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
+    border: '1px solid var(--border-color)',
   },
   heading: {
     marginTop: 0,
     marginBottom: '20px',
     fontSize: '1.4rem',
-    color: '#89b4fa',
+    color: 'var(--primary)',
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '18px',
   },
   fieldGroup: {
     display: 'flex',
@@ -175,22 +211,22 @@ const styles: Record<string, React.CSSProperties> = {
   },
   hint: {
     fontSize: '0.8rem',
-    color: '#a6adc8',
+    color: 'var(--text-muted)',
   },
   input: {
-    padding: '10px',
-    borderRadius: '6px',
-    border: '1px solid #45475a',
-    backgroundColor: '#313244',
-    color: '#cdd6f4',
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--bg-app)',
+    color: 'var(--text-main)',
     fontSize: '1rem',
   },
   select: {
-    padding: '10px',
-    borderRadius: '6px',
-    border: '1px solid #45475a',
-    backgroundColor: '#313244',
-    color: '#cdd6f4',
+    padding: '10px 12px',
+    borderRadius: '8px',
+    border: '1px solid var(--border-color)',
+    backgroundColor: 'var(--bg-app)',
+    color: 'var(--text-main)',
     fontSize: '1rem',
   },
   modelTagList: {
@@ -199,55 +235,59 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   tag: {
-    backgroundColor: '#45475a',
+    backgroundColor: 'var(--bg-card-hover)',
+    color: 'var(--text-main)',
     padding: '4px 10px',
     borderRadius: '16px',
     fontSize: '0.85rem',
     display: 'inline-flex',
     alignItems: 'center',
     gap: '6px',
+    border: '1px solid var(--border-color)',
   },
   tagRemoveBtn: {
     background: 'none',
     border: 'none',
-    color: '#f38ba8',
+    color: 'var(--danger)',
     cursor: 'pointer',
     fontWeight: 'bold',
     fontSize: '1rem',
     lineHeight: 1,
   },
   primaryBtn: {
-    backgroundColor: '#89b4fa',
-    color: '#11111b',
+    backgroundColor: 'var(--primary)',
+    color: '#0f172a',
     fontWeight: 'bold',
     padding: '12px',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '1rem',
     marginTop: '8px',
   },
   secBtn: {
-    backgroundColor: '#45475a',
-    color: '#cdd6f4',
+    backgroundColor: 'var(--bg-card-hover)',
+    color: 'var(--text-main)',
     padding: '10px 14px',
-    border: 'none',
-    borderRadius: '6px',
+    border: '1px solid var(--border-color)',
+    borderRadius: '8px',
     cursor: 'pointer',
   },
   successBadge: {
-    backgroundColor: '#a6e3a1',
-    color: '#11111b',
-    padding: '10px',
-    borderRadius: '6px',
+    backgroundColor: 'rgba(74, 222, 128, 0.15)',
+    color: 'var(--success)',
+    border: '1px solid rgba(74, 222, 128, 0.3)',
+    padding: '12px',
+    borderRadius: '8px',
     marginBottom: '16px',
     fontWeight: 600,
   },
   errorAlert: {
-    backgroundColor: '#f38ba8',
-    color: '#11111b',
-    padding: '10px',
-    borderRadius: '6px',
+    backgroundColor: 'rgba(248, 113, 113, 0.15)',
+    color: 'var(--danger)',
+    border: '1px solid rgba(248, 113, 113, 0.3)',
+    padding: '12px',
+    borderRadius: '8px',
     marginBottom: '16px',
     fontWeight: 600,
   },
