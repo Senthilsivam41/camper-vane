@@ -1,0 +1,16 @@
+# Binaries and DB
+*.db
+*.db-shm
+*.db-wal
+camper_vane.db
+server
+
+# Dependency directories
+node_modules/
+dist/
+
+# Agent & AutoClaw metadata
+.autoclaw/
+.agent/
+.claude/
+.gemini/
