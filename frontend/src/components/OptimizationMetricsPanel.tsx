@@ -21,17 +21,17 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
 
   const getModelBadgeStyle = (modelName?: string): React.CSSProperties => {
     const m = (modelName || '').toLowerCase();
-    let bg = '#89b4fa'; // default blue
-    let fg = '#11111b';
+    let bg = 'var(--primary)';
+    let fg = '#0f172a';
 
     if (m.includes('claude')) {
-      bg = '#cba6f7'; // mauve / purple
+      bg = 'var(--purple)';
     } else if (m.includes('gpt-4o-mini') || m.includes('mini')) {
-      bg = '#fab387'; // amber
+      bg = 'var(--amber)';
     } else if (m.includes('gpt-4o') || m.includes('openai')) {
-      bg = '#a6e3a1'; // green
+      bg = 'var(--success)';
     } else if (m.includes('gemini')) {
-      bg = '#89b4fa'; // blue
+      bg = 'var(--primary)';
     }
 
     return {
@@ -50,29 +50,33 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
   };
 
   const getGaugeColor = (pct: number) => {
-    if (pct >= 85) return '#f38ba8'; // red alert
-    if (pct >= 70) return '#f9e2af'; // yellow warning
-    return '#a6e3a1'; // green nominal
+    if (pct >= 85) return 'var(--danger)';
+    if (pct >= 70) return 'var(--warning)';
+    return 'var(--success)';
   };
 
   return (
-    <div style={styles.container}>
+    <section
+      role="region"
+      aria-label="Optimization & Metrics Area"
+      style={styles.container}
+    >
       <div style={styles.topRow}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.85rem', color: '#a6adc8', fontWeight: 600 }}>Active Model:</span>
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Active Model:</span>
           {metrics?.selected_model ? (
-            <span style={getModelBadgeStyle(metrics.selected_model)}>
+            <span style={getModelBadgeStyle(metrics.selected_model)} aria-label={`Negotiated model: ${metrics.selected_model}`}>
               ● {metrics.selected_model}
             </span>
           ) : (
-            <span style={{ ...getModelBadgeStyle(''), opacity: 0.6 }}>
+            <span style={{ ...getModelBadgeStyle(''), opacity: 0.6 }} aria-label="Negotiating model">
               ○ Auto-Negotiating...
             </span>
           )}
         </div>
 
         {metrics?.estimated_cost_delta && (
-          <span style={styles.costBadge}>
+          <span style={styles.costBadge} aria-label={`Estimated cost savings: ${metrics.estimated_cost_delta}`}>
             Est. Cost Savings: {metrics.estimated_cost_delta}
           </span>
         )}
@@ -82,11 +86,18 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
       <div style={styles.gaugeSection}>
         <div style={styles.gaugeHeader}>
           <span style={styles.gaugeLabel}>Daily Token Consumption Bar:</span>
-          <span style={styles.gaugeValue}>
+          <span style={styles.gaugeValue} aria-label={`Token consumption: ${currentTotal} of ${dailyCap} tokens, ${usagePercentage} percent`}>
             {currentTotal.toLocaleString()} / {dailyCap.toLocaleString()} tokens ({usagePercentage}%)
           </span>
         </div>
-        <div style={styles.trackBackground}>
+        <div
+          role="progressbar"
+          aria-valuenow={usagePercentage}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Daily token budget usage"
+          style={styles.trackBackground}
+        >
           <div
             style={{
               ...styles.trackFill,
@@ -99,14 +110,16 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
 
       {/* Rationale & Optimization Readout */}
       {metrics?.routing_rationale && (
-        <div style={styles.rationaleBox}>
+        <div style={styles.rationaleBox} aria-live="polite">
           <span style={styles.rationaleTitle}>Optimization Engine Insight:</span>
           <p style={styles.rationaleText}>{metrics.routing_rationale}</p>
           {metrics.complexity_score !== undefined && (
             <div style={styles.scoreRow}>
               <span>Analyzed Complexity Score: <strong>{(metrics.complexity_score * 100).toFixed(0)}%</strong></span>
               {metrics.budget_throttled && (
-                <span style={styles.throttleAlert}>⚠️ Volumetric Throttled (≥85% Budget Cap)</span>
+                <span style={styles.throttleAlert} role="alert">
+                  ⚠️ Volumetric Throttled (≥85% Budget Cap)
+                </span>
               )}
             </div>
           )}
@@ -114,23 +127,22 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
       )}
 
       {status === 'streaming' && (
-        <div style={styles.streamingIndicator}>
-          <span style={styles.dot}></span> SSE Word-by-Word Stream Active...
+        <div style={styles.streamingIndicator} aria-live="polite" aria-busy="true">
+          <span style={styles.dot} className="pulse-dot"></span> SSE Word-by-Word Stream Active...
         </div>
       )}
-    </div>
+    </section>
   );
 };
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    backgroundColor: '#181825',
-    border: '1px solid #313244',
-    borderRadius: '10px',
-    padding: '16px',
-    marginTop: '12px',
-    fontFamily: 'system-ui, -apple-system, sans-serif',
-    color: '#cdd6f4',
+    backgroundColor: 'var(--bg-card)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '12px',
+    padding: '18px',
+    marginTop: '14px',
+    color: 'var(--text-main)',
   },
   topRow: {
     display: 'flex',
@@ -141,8 +153,9 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   costBadge: {
-    backgroundColor: '#313244',
-    color: '#a6e3a1',
+    backgroundColor: 'rgba(74, 222, 128, 0.15)',
+    color: 'var(--success)',
+    border: '1px solid rgba(74, 222, 128, 0.3)',
     padding: '4px 10px',
     borderRadius: '6px',
     fontSize: '0.8rem',
@@ -155,8 +168,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     fontSize: '0.8rem',
-    marginBottom: '4px',
-    color: '#a6adc8',
+    marginBottom: '6px',
+    color: 'var(--text-muted)',
   },
   gaugeLabel: {
     fontWeight: 600,
@@ -165,9 +178,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   trackBackground: {
-    backgroundColor: '#313244',
+    backgroundColor: 'var(--bg-app)',
     borderRadius: '6px',
-    height: '8px',
+    height: '10px',
     width: '100%',
     overflow: 'hidden',
   },
@@ -176,47 +189,45 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'width 0.4s ease-in-out, background-color 0.4s ease',
   },
   rationaleBox: {
-    backgroundColor: '#1e1e2e',
-    borderLeft: '4px solid #89b4fa',
-    padding: '10px 14px',
-    borderRadius: '0 6px 6px 0',
+    backgroundColor: 'var(--bg-app)',
+    borderLeft: '4px solid var(--primary)',
+    padding: '12px 14px',
+    borderRadius: '0 8px 8px 0',
     fontSize: '0.85rem',
   },
   rationaleTitle: {
     fontWeight: 'bold',
-    color: '#89b4fa',
+    color: 'var(--primary)',
     display: 'block',
     marginBottom: '2px',
   },
   rationaleText: {
     margin: 0,
-    color: '#bac2de',
+    color: 'var(--text-main)',
     lineHeight: 1.4,
   },
   scoreRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    marginTop: '6px',
+    marginTop: '8px',
     fontSize: '0.75rem',
-    color: '#a6adc8',
+    color: 'var(--text-muted)',
   },
   throttleAlert: {
-    color: '#f38ba8',
+    color: 'var(--danger)',
     fontWeight: 'bold',
   },
   streamingIndicator: {
-    marginTop: '10px',
+    marginTop: '12px',
     fontSize: '0.8rem',
-    color: '#89b4fa',
+    color: 'var(--primary)',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '8px',
+    fontWeight: 600,
   },
   dot: {
     width: '8px',
     height: '8px',
-    borderRadius: '50%',
-    backgroundColor: '#89b4fa',
-    display: 'inline-block',
   },
 };
