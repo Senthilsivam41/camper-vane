@@ -1,20 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChatInterface } from './components/ChatInterface';
 import { UserSettings } from './components/UserSettings';
-import { handleCallback } from './services/api';
+import { handleCallback, checkMe } from './services/api';
 
 export function App() {
   const [authed, setAuthed] = useState<boolean>(false);
   const [loggingIn, setLoggingIn] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'settings'>('chat');
+
+  useEffect(() => {
+    // Auto-check session on load
+    checkMe()
+      .then(() => setAuthed(true))
+      .catch(() => setAuthed(false));
+  }, []);
 
   const triggerMockLogin = async () => {
     try {
       setLoggingIn(true);
+      setAuthError(null);
       await handleCallback('mock_auth_code', 'developer-1');
       setAuthed(true);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setAuthError(
+        err.message || 'Failed to connect to backend server on http://localhost:8080. Make sure `go run ./cmd/server/main.go` is running.'
+      );
     } finally {
       setLoggingIn(false);
     }
@@ -60,6 +72,13 @@ export function App() {
           <p style={{ color: '#cdd6f4', lineHeight: 1.5 }}>
             Authenticate via OAuth2 session (Google / GitHub) to access the pre-configured routing platform without manual provider API keys.
           </p>
+
+          {authError && (
+            <div style={{ backgroundColor: '#f38ba8', color: '#11111b', padding: '12px', borderRadius: '8px', marginBottom: '16px', fontWeight: 'bold', fontSize: '0.85rem', textAlign: 'left' }}>
+              ⚠️ {authError}
+            </div>
+          )}
+
           <button
             onClick={triggerMockLogin}
             disabled={loggingIn}
@@ -72,7 +91,7 @@ export function App() {
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
-              marginTop: '12px',
+              marginTop: '8px',
             }}
           >
             {loggingIn ? 'Authenticating...' : 'Sign in with OAuth (Google / GitHub)'}
