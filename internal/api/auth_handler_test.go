@@ -17,7 +17,15 @@ func TestAuthHandler(t *testing.T) {
 	}
 	defer repo.Close()
 
-	handler := NewAuthHandler(repo)
+	handler := NewAuthHandler(repo, nil)
+
+	// Login status probe (mock available without IdP credentials)
+	reqStatus := httptest.NewRequest("GET", "/api/v1/auth/login?intent=status", nil)
+	wStatus := httptest.NewRecorder()
+	handler.HandleLogin(wStatus, reqStatus)
+	if wStatus.Code != http.StatusOK {
+		t.Fatalf("expected 200 for login status, got %d", wStatus.Code)
+	}
 
 	// Test 1: Callback exchanges code, sets HttpOnly cookie, provisions profile
 	req := httptest.NewRequest("GET", "/api/v1/auth/callback?code=testcode123&mock_user_id=dev-user-1", nil)
@@ -62,5 +70,22 @@ func TestAuthHandler(t *testing.T) {
 	}
 	if userCfg.UserID != "dev-user-1" {
 		t.Errorf("expected UserID dev-user-1, got %s", userCfg.UserID)
+	}
+
+	// Test 3: Logout clears session
+	reqLogout := httptest.NewRequest("POST", "/api/v1/auth/logout", nil)
+	wLogout := httptest.NewRecorder()
+	handler.HandleLogout(wLogout, reqLogout)
+	if wLogout.Code != http.StatusOK {
+		t.Fatalf("expected 200 for logout, got %d", wLogout.Code)
+	}
+	cleared := false
+	for _, c := range wLogout.Result().Cookies() {
+		if c.Name == auth.CookieName && c.Value == "" {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Error("expected session cookie to be cleared on logout")
 	}
 }

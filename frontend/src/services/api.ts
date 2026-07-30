@@ -5,6 +5,13 @@ export interface UserConfig {
   preferred_models: string[];
 }
 
+export interface LoginResponse {
+  auth_url: string;
+  provider: string;
+  mock: boolean;
+  available_providers: string[];
+}
+
 export async function fetchUserConfig(): Promise<UserConfig> {
   const res = await fetch('/api/v1/user/config', { credentials: 'include' });
   if (!res.ok) {
@@ -27,17 +34,37 @@ export async function updateUserConfig(config: Partial<UserConfig>): Promise<Use
   return res.json();
 }
 
-export async function loginOAuth(provider: string = 'google'): Promise<{ auth_url: string }> {
+export async function loginOAuth(provider: string = 'google'): Promise<LoginResponse> {
   const res = await fetch(`/api/v1/auth/login?provider=${provider}`, { credentials: 'include' });
-  if (!res.ok) throw new Error('Login failed');
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || 'Login failed');
+  }
   return res.json();
 }
 
-export async function handleCallback(code: string, mockUserId?: string): Promise<any> {
-  const url = mockUserId
-    ? `/api/v1/auth/callback?code=${code}&mock_user_id=${mockUserId}`
-    : `/api/v1/auth/callback?code=${code}`;
-  const res = await fetch(url, { credentials: 'include' });
+export async function authStatus(): Promise<LoginResponse> {
+  const res = await fetch('/api/v1/auth/login?intent=status', { credentials: 'include' });
+  if (!res.ok) {
+    throw new Error('Failed to load auth status');
+  }
+  return res.json();
+}
+
+export async function handleCallback(
+  code: string,
+  options?: { mockUserId?: string; provider?: string; state?: string }
+): Promise<any> {
+  const params = new URLSearchParams({ code });
+  if (options?.mockUserId) params.set('mock_user_id', options.mockUserId);
+  if (options?.provider) params.set('provider', options.provider);
+  if (options?.state) params.set('state', options.state);
+  params.set('format', 'json');
+
+  const res = await fetch(`/api/v1/auth/callback?${params.toString()}`, {
+    credentials: 'include',
+    headers: { Accept: 'application/json' },
+  });
   if (!res.ok) {
     const errText = await res.text();
     throw new Error(errText || `Auth callback failed (${res.status})`);
@@ -49,4 +76,15 @@ export async function checkMe(): Promise<UserConfig> {
   const res = await fetch('/api/v1/auth/me', { credentials: 'include' });
   if (!res.ok) throw new Error('Not authenticated');
   return res.json();
+}
+
+export async function logout(): Promise<void> {
+  const res = await fetch('/api/v1/auth/logout', {
+    method: 'POST',
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(errText || `Logout failed (${res.status})`);
+  }
 }

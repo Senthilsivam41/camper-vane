@@ -11,7 +11,7 @@ import (
 
 const CookieName = "session_token"
 
-var jwtSecret = []byte("camper-vane-dev-secret-key-32bytes!")
+var jwtSecret = []byte(defaultDevJWTSecret)
 
 type Claims struct {
 	UserID string `json:"user_id"`
@@ -68,7 +68,7 @@ func SetSessionCookie(w http.ResponseWriter, tokenString string, duration time.D
 		Path:     "/",
 		Expires:  time.Now().Add(duration),
 		HttpOnly: true,
-		Secure:   false, // Set true in production over HTTPS
+		Secure:   cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -80,7 +80,7 @@ func ClearSessionCookie(w http.ResponseWriter) {
 		Path:     "/",
 		Expires:  time.Unix(0, 0),
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   cookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
