@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -28,9 +27,11 @@ type openAIChatResponseChunk struct {
 }
 
 func (c *OpenAIClient) StreamChat(ctx context.Context, req ChatRequest, chunkChan chan<- StreamChunk) error {
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey, err := ResolveAPIKey("OPENAI_API_KEY")
+	if err != nil {
+		return err
+	}
 	if apiKey == "" {
-		// Fallback to mock stream if API key is not configured
 		mock := &MockClient{}
 		return mock.StreamChat(ctx, req, chunkChan)
 	}

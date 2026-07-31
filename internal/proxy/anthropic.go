@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -32,7 +31,10 @@ type anthropicEvent struct {
 }
 
 func (c *AnthropicClient) StreamChat(ctx context.Context, req ChatRequest, chunkChan chan<- StreamChunk) error {
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	apiKey, err := ResolveAPIKey("ANTHROPIC_API_KEY")
+	if err != nil {
+		return err
+	}
 	if apiKey == "" {
 		mock := &MockClient{}
 		return mock.StreamChat(ctx, req, chunkChan)

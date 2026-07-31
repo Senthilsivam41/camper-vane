@@ -14,14 +14,14 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 
 ## P0 — Make it real and shippable
 
-| ID | Task | Why | Effort | Depends on | Done when |
-|---|---|---|---|---|---|
-| **P0-1** | Merge epic work into `main` via PR | App code is only on feature branches; `main` is docs-only | S | — | PR merged; CI green on `main` |
-| **P0-2** | Real Google + GitHub OAuth2 handshake | Auth is mock-only today; AC for Story #1 unmet | M | P0-1 | `/auth/login` redirects to IdP; `/auth/callback` exchanges code; HttpOnly session cookie set; first login provisions SQLite profile |
-| **P0-3** | Production session security | JWT secret hardcoded; `Secure=false` | S | P0-2 | `JWT_SECRET` from env; `Secure=true` when HTTPS; reject empty/default secrets in prod |
-| **P0-4** | Decide & implement provider credential model | Conflicts with “Zero Trust / no end-user API keys”; today needs env keys or mocks | M | P0-1 | Documented model (server-held secrets **or** provider OAuth); providers fail loudly if misconfigured (no silent mock in prod) |
-| **P0-5** | Wire live providers end-to-end | Chat only useful with real streams | M | P0-4 | OpenAI / Anthropic / Gemini stream with real keys; token usage recorded; SSE `metrics` → `text` → `final_usage` verified in UI |
-| **P0-6** | Frontend logout | Backend exists; UI never calls it | S | P0-2 | Logout clears cookie, returns to auth screen, `/auth/me` fails |
+| ID | Task | Why | Effort | Depends on | Done when | Status |
+|---|---|---|---|---|---|---|
+| **P0-1** | Merge epic work into `main` via PR | App code is only on feature branches; `main` is docs-only | S | — | PR merged; CI green on `main` | In progress (PR) |
+| **P0-2** | Real Google + GitHub OAuth2 handshake | Auth is mock-only today; AC for Story #1 unmet | M | P0-1 | `/auth/login` redirects to IdP; `/auth/callback` exchanges code; HttpOnly session cookie set; first login provisions SQLite profile | Done (mock fallback when IdP unset) |
+| **P0-3** | Production session security | JWT secret hardcoded; `Secure=false` | S | P0-2 | `JWT_SECRET` from env; `Secure=true` when HTTPS; reject empty/default secrets in prod | Done |
+| **P0-4** | Decide & implement provider credential model | Conflicts with “Zero Trust / no end-user API keys”; today needs env keys or mocks | M | P0-1 | Documented model (server-held secrets **or** provider OAuth); providers fail loudly if misconfigured (no silent mock in prod) | Done (server-held secrets) |
+| **P0-5** | Wire live providers end-to-end | Chat only useful with real streams | M | P0-4 | OpenAI / Anthropic / Gemini stream with real keys; token usage recorded; SSE `metrics` → `text` → `final_usage` verified in UI | Done (SSE `error` on misconfig) |
+| **P0-6** | Frontend logout | Backend exists; UI never calls it | S | P0-2 | Logout clears cookie, returns to auth screen, `/auth/me` fails | Done |
 
 ---
 

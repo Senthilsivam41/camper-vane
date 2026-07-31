@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -29,7 +28,10 @@ type geminiResponseChunk struct {
 }
 
 func (c *GeminiClient) StreamChat(ctx context.Context, req ChatRequest, chunkChan chan<- StreamChunk) error {
-	apiKey := os.Getenv("GEMINI_API_KEY")
+	apiKey, err := ResolveAPIKey("GEMINI_API_KEY")
+	if err != nil {
+		return err
+	}
 	if apiKey == "" {
 		mock := &MockClient{}
 		return mock.StreamChat(ctx, req, chunkChan)

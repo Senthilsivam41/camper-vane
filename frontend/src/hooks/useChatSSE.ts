@@ -88,6 +88,7 @@ export function useChatSSE() {
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let sawError = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -136,6 +137,18 @@ export function useChatSSE() {
               );
             } else if (eventName === 'final_usage') {
               setFinalUsage(parsedData as FinalUsageData);
+            } else if (eventName === 'error') {
+              sawError = true;
+              const message = parsedData.message || 'Provider stream failed';
+              setStatus('error');
+              setErrorMsg(message);
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantMsgId
+                    ? { ...msg, content: msg.content || `Error: ${message}` }
+                    : msg
+                )
+              );
             }
           } catch (e) {
             console.warn('Failed to parse SSE JSON payload:', dataStr, e);
@@ -143,8 +156,9 @@ export function useChatSSE() {
         }
       }
 
-      setStatus('completed');
-    } catch (err: any) {
+      if (!sawError) {
+        setStatus('completed');
+      }    } catch (err: any) {
       if (err.name === 'AbortError') {
         setStatus('idle');
         return;

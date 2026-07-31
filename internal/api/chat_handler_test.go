@@ -21,7 +21,7 @@ func TestChatStreamHandler(t *testing.T) {
 
 	rEngine := router.NewRouter(repo, repo)
 	streamHandler := NewChatStreamHandler(repo, repo, rEngine)
-	authHandler := NewAuthHandler(repo)
+	authHandler := NewAuthHandler(repo, nil)
 
 	// Register user session
 	wAuth := httptest.NewRecorder()

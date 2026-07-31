@@ -44,9 +44,14 @@ type TextEvent struct {
 }
 
 type FinalUsageEvent struct {
-	InputTokensConsumed int64 `json:"input_tokens_consumed"`
+	InputTokensConsumed  int64 `json:"input_tokens_consumed"`
 	OutputTokensConsumed int64 `json:"output_tokens_consumed"`
-	UpdatedDailyTotal   int64 `json:"updated_daily_total"`
+	UpdatedDailyTotal    int64 `json:"updated_daily_total"`
+}
+
+type ErrorEvent struct {
+	Message string `json:"message"`
+	Code    string `json:"code,omitempty"`
 }
 
 func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +86,6 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 		req.SessionID = "default-session"
 	}
 
-	// 1. Evaluate Dual-Tier Routing Decision
 	decision, err := h.router.EvaluateRoute(r.Context(), router.RouteRequest{
 		UserID:         userID,
 		SessionID:      req.SessionID,
@@ -96,13 +100,11 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Set SSE Headers
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	// 2. Emit `event: metrics` with routing insight
 	metrics := MetricsEvent{
 		SelectedModel:      decision.SelectedModel,
 		RoutingRationale:   decision.RoutingRationale,
@@ -112,7 +114,6 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 	}
 	sendSSEEvent(w, flusher, "metrics", metrics)
 
-	// Append user prompt to session store
 	_ = h.sessionRepo.AppendToSession(r.Context(), req.SessionID, db.SessionMessage{
 		SessionID: req.SessionID,
 		Role:      "user",
@@ -120,9 +121,9 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 		Timestamp: time.Now(),
 	})
 
-	// 3. Negotiate provider client and stream text deltas
 	client := proxy.GetProviderClient(decision.SelectedModel)
 	chunkChan := make(chan proxy.StreamChunk, 100)
+	errChan := make(chan error, 1)
 
 	proxyReq := proxy.ChatRequest{
 		SessionID: req.SessionID,
@@ -132,13 +133,20 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 
 	go func() {
 		defer close(chunkChan)
-		_ = client.StreamChat(r.Context(), proxyReq, chunkChan)
+		if streamErr := client.StreamChat(r.Context(), proxyReq, chunkChan); streamErr != nil {
+			errChan <- streamErr
+		}
 	}()
 
 	var fullAssistantText string
 	var inputTokens, outputTokens int64
+	var streamErr error
 
 	for chunk := range chunkChan {
+		if chunk.Error != nil {
+			streamErr = chunk.Error
+			break
+		}
 		if chunk.IsFinal {
 			inputTokens = chunk.InputTokensConsumed
 			outputTokens = chunk.OutputTokensConsumed
@@ -148,7 +156,22 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Append assistant response to session store
+	select {
+	case err := <-errChan:
+		if err != nil {
+			streamErr = err
+		}
+	default:
+	}
+
+	if streamErr != nil {
+		sendSSEEvent(w, flusher, "error", ErrorEvent{
+			Message: streamErr.Error(),
+			Code:    "provider_stream_failed",
+		})
+		return
+	}
+
 	_ = h.sessionRepo.AppendToSession(r.Context(), req.SessionID, db.SessionMessage{
 		SessionID: req.SessionID,
 		Role:      "assistant",
@@ -156,17 +179,15 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 		Timestamp: time.Now(),
 	})
 
-	// Increment daily usage
 	totalTokens := inputTokens + outputTokens
 	now := time.Now()
 	_ = h.userRepo.IncrementDailyUsage(r.Context(), userID, now, totalTokens)
 	updatedDaily, _ := h.userRepo.GetDailyUsage(r.Context(), userID, now)
 
-	// 4. Emit `event: final_usage`
 	finalUsage := FinalUsageEvent{
-		InputTokensConsumed: inputTokens,
+		InputTokensConsumed:  inputTokens,
 		OutputTokensConsumed: outputTokens,
-		UpdatedDailyTotal:   updatedDaily,
+		UpdatedDailyTotal:    updatedDaily,
 	}
 	sendSSEEvent(w, flusher, "final_usage", finalUsage)
 }

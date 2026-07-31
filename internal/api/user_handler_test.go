@@ -18,7 +18,7 @@ func TestUserConfigAPI(t *testing.T) {
 	defer repo.Close()
 
 	userHandler := NewUserHandler(repo)
-	authHandler := NewAuthHandler(repo)
+	authHandler := NewAuthHandler(repo, nil)
 
 	// Obtain session cookie
 	wAuth := httptest.NewRecorder()
