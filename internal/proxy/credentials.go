@@ -9,8 +9,8 @@ import (
 
 var allowMockProviders = true // default for tests/local until InitCredentialsFromEnv runs
 
-// Credential model (P0-4):
-//   - Server-held secrets only: OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY.
+// Credential model (P0-4 / Epic 2):
+//   - Server-held secrets only: OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY, PERPLEXITY_API_KEY.
 //   - UI never collects provider keys (zero-trust toward end users).
 //   - Development: missing keys → MockClient stream.
 //   - Production (or ALLOW_MOCK_PROVIDERS=false): missing keys → hard error (no silent mock).

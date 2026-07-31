@@ -15,6 +15,12 @@ func TestProviderFactory(t *testing.T) {
 	if _, ok := GetProviderClient("gemini-1.5-flash").(*GeminiClient); !ok {
 		t.Errorf("expected GeminiClient for gemini-1.5-flash")
 	}
+	if _, ok := GetProviderClient("sonar-pro").(*PerplexityClient); !ok {
+		t.Errorf("expected PerplexityClient for sonar-pro")
+	}
+	if _, ok := GetProviderClient("perplexity-sonar").(*PerplexityClient); !ok {
+		t.Errorf("expected PerplexityClient for perplexity-sonar")
+	}
 	if _, ok := GetProviderClient("unknown-model").(*MockClient); !ok {
 		t.Errorf("expected MockClient for unknown model")
 	}

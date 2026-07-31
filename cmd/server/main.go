@@ -18,22 +18,17 @@ func main() {
 	}
 	proxy.InitCredentialsFromEnv()
 
-	dbPath := os.Getenv("DATABASE_PATH")
-	if dbPath == "" {
-		dbPath = "camper_vane.db"
-	}
-
-	repo, err := db.NewSQLiteRepo(dbPath)
+	store, err := db.NewStoreFromEnv()
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	defer repo.Close()
+	defer store.Close()
 
 	oauth := auth.NewOAuthManagerFromEnv()
-	routerEngine := router.NewRouter(repo, repo)
-	authHandler := api.NewAuthHandler(repo, oauth)
-	userHandler := api.NewUserHandler(repo)
-	chatHandler := api.NewChatStreamHandler(repo, repo, routerEngine)
+	routerEngine := router.NewRouter(store, store)
+	authHandler := api.NewAuthHandler(store, oauth)
+	userHandler := api.NewUserHandler(store)
+	chatHandler := api.NewChatStreamHandler(store, store, routerEngine)
 
 	mux := http.NewServeMux()
 

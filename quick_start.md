@@ -25,7 +25,8 @@ Ensure the following tools are installed on your system:
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `PORT` | `8080` | Port for Go HTTP server |
-| `DATABASE_PATH` | `camper_vane.db` | Path to embedded SQLite database file |
+| `DATABASE_PATH` | `camper_vane.db` | SQLite file path (used when `DATABASE_URL` unset) |
+| `DATABASE_URL` | _(empty)_ | PostgreSQL DSN (e.g. `postgres://user:pass@localhost:5432/camper_vane`). When set, replaces SQLite |
 | `APP_ENV` | `development` | Use `production` to enforce secrets and secure cookies |
 | `JWT_SECRET` | dev default | Required non-default value when `APP_ENV=production` |
 | `COOKIE_SECURE` | `true` in prod | Set `true` behind HTTPS |
@@ -49,6 +50,7 @@ Users never enter provider API keys in the UI. Configure secrets on the server:
 | `OPENAI_API_KEY` | OpenAI / GPT models |
 | `ANTHROPIC_API_KEY` | Claude models |
 | `GEMINI_API_KEY` | Gemini models |
+| `PERPLEXITY_API_KEY` | Perplexity / Sonar models |
 | `ALLOW_MOCK_PROVIDERS` | Default `true` outside production. In production, missing keys fail loudly (no silent mock) |
 
 ---

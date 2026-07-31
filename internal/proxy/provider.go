@@ -32,6 +32,8 @@ func GetProviderClient(model string) ProviderClient {
 		return &AnthropicClient{}
 	case strings.HasPrefix(m, "gemini") || strings.HasPrefix(m, "google"):
 		return &GeminiClient{}
+	case strings.HasPrefix(m, "sonar") || strings.HasPrefix(m, "perplexity"):
+		return &PerplexityClient{}
 	default:
 		return &MockClient{}
 	}

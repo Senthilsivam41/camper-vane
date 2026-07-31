@@ -109,7 +109,7 @@ func (r *SQLiteRepo) GetUserConfig(ctx context.Context, userID string) (*UserCon
 			UserID:          userID,
 			DailyTokenCap:   50000,
 			RoutingStrategy: "simple",
-			PreferredModels: []string{"gemini-1.5-flash", "gpt-4o-mini", "claude-3-5-sonnet"},
+			PreferredModels: []string{"gemini-1.5-flash", "gpt-4o-mini", "claude-3-5-sonnet", "sonar"},
 		}
 		if err := r.UpdateUserConfig(ctx, defaultCfg); err != nil {
 			return nil, fmt.Errorf("failed to provision default user config: %w", err)

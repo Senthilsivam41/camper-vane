@@ -35,7 +35,7 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 | **P1-4** | Real cost delta estimation | `estimated_cost_delta` is hardcoded strings | M | P0-5 | Cost table per model; delta vs baseline model; emitted in `metrics` event |
 | **P1-5** | Session history restore + multi-session | History is persisted server-side but UI always starts empty / single default session | M | P0-5 | List sessions; open session loads history; new session creates distinct `session_id` |
 | **P1-6** | SSE disconnect auto-retry | Story #8 AC requires retry; hook only surfaces error | S | P0-5 | Transient failures retry with backoff; user sees retry status; abort cancels retries |
-| **P1-7** | Perplexity provider adapter | Named in system overview; not implemented | M | P0-4 | `GetProviderClient` routes Perplexity models; streaming + usage work like other providers |
+| **P1-7** | Perplexity provider adapter _(done)_ | Multi-provider SSE gap | M | P0-4 | `GetProviderClient` routes Perplexity/Sonar models |
 | **P1-8** | Env / ops documentation | `quick_start` covers mocks only | S | P0-2, P0-4 | Document OAuth client IDs, JWT secret, provider keys, `DATABASE_PATH`, `PORT`, prod cookie flags |
 
 ---
@@ -44,7 +44,7 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 
 | ID | Task | Why | Effort | Depends on | Done when |
 |---|---|---|---|---|---|
-| **P2-1** | PostgreSQL repository implementation | Pluggable persistence goal; SQLite-only today | L | P0-1 | `PostgresRepo` implements same interfaces; selected via env (e.g. `DATABASE_URL`) |
+| **P2-1** | PostgreSQL repository implementation _(done)_ | Pluggable persistence goal | L | P0-1 | `PostgresRepo` + `DATABASE_URL` via `NewStoreFromEnv()` |
 | **P2-2** | Stronger advanced-mode classifier | Keyword regex ≠ semantic classification | L | P1-1 | Scoring uses richer signals (or lightweight model); tests cover complex vs simple prompts |
 | **P2-3** | Frontend CI (build + lint + unit) | Workflow is Go-only | S | P0-1 | GH Action runs `npm ci` / `build` / tests on frontend changes |
 | **P2-4** | Auth + chat integration / e2e tests | Unit tests exist; no full flow coverage | M | P0-2, P0-5 | Automated happy path: login → config → stream → usage |
