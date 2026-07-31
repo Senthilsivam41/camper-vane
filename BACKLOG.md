@@ -17,9 +17,9 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 | ID | Task | Why | Effort | Depends on | Done when | Status |
 |---|---|---|---|---|---|---|
 | **P0-1** | Merge epic work into `main` via PR | App code is only on feature branches; `main` is docs-only | S | — | PR merged; CI green on `main` | In progress (PR) |
-| **P0-2** | Real Google + GitHub OAuth2 handshake | Auth is mock-only today; AC for Story #1 unmet | M | P0-1 | `/auth/login` redirects to IdP; `/auth/callback` exchanges code; HttpOnly session cookie set; first login provisions SQLite profile | Done (mock fallback when IdP unset) |
-| **P0-3** | Production session security | JWT secret hardcoded; `Secure=false` | S | P0-2 | `JWT_SECRET` from env; `Secure=true` when HTTPS; reject empty/default secrets in prod | Done |
-| **P0-4** | Decide & implement provider credential model | Conflicts with “Zero Trust / no end-user API keys”; today needs env keys or mocks | M | P0-1 | Documented model (server-held secrets **or** provider OAuth); providers fail loudly if misconfigured (no silent mock in prod) | Done (server-held secrets) |
+| **P0-2** | Real Google + GitHub OAuth2 handshake | Auth is mock-only today; AC for Story #1 unmet | M | P0-1 | `/auth/login` redirects to IdP; `/auth/callback` exchanges code; HttpOnly session cookie set; first login provisions SQLite profile | Done + Exchange unit tests |
+| **P0-3** | Production session security | JWT secret hardcoded; `Secure=false` | S | P0-2 | `JWT_SECRET` from env; `Secure=true` when HTTPS; reject empty/default secrets in prod | Done + Secure cookie assertions |
+| **P0-4** | Decide & implement provider credential model | Conflicts with “Zero Trust / no end-user API keys”; today needs env keys or mocks | M | P0-1 | Documented model (server-held secrets **or** provider OAuth); providers fail loudly if misconfigured (no silent mock in prod) | Done (server-held; fail-loud tests) |
 | **P0-5** | Wire live providers end-to-end | Chat only useful with real streams | M | P0-4 | OpenAI / Anthropic / Gemini stream with real keys; token usage recorded; SSE `metrics` → `text` → `final_usage` verified in UI | Done (SSE `error` on misconfig) |
 | **P0-6** | Frontend logout | Backend exists; UI never calls it | S | P0-2 | Logout clears cookie, returns to auth screen, `/auth/me` fails | Done |
 
@@ -35,7 +35,7 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 | **P1-4** | Real cost delta estimation | `estimated_cost_delta` is hardcoded strings | M | P0-5 | Cost table per model; delta vs baseline model; emitted in `metrics` event |
 | **P1-5** | Session history restore + multi-session | History is persisted server-side but UI always starts empty / single default session | M | P0-5 | List sessions; open session loads history; new session creates distinct `session_id` |
 | **P1-6** | SSE disconnect auto-retry | Story #8 AC requires retry; hook only surfaces error | S | P0-5 | Transient failures retry with backoff; user sees retry status; abort cancels retries |
-| **P1-7** | Perplexity provider adapter | Named in system overview; not implemented | M | P0-4 | `GetProviderClient` routes Perplexity models; streaming + usage work like other providers |
+| **P1-7** | Perplexity provider adapter _(done)_ | Multi-provider SSE gap | M | P0-4 | `GetProviderClient` routes Perplexity/Sonar models |
 | **P1-8** | Env / ops documentation | `quick_start` covers mocks only | S | P0-2, P0-4 | Document OAuth client IDs, JWT secret, provider keys, `DATABASE_PATH`, `PORT`, prod cookie flags |
 
 ---
@@ -44,7 +44,7 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 
 | ID | Task | Why | Effort | Depends on | Done when |
 |---|---|---|---|---|---|
-| **P2-1** | PostgreSQL repository implementation | Pluggable persistence goal; SQLite-only today | L | P0-1 | `PostgresRepo` implements same interfaces; selected via env (e.g. `DATABASE_URL`) |
+| **P2-1** | PostgreSQL repository implementation _(done)_ | Pluggable persistence goal | L | P0-1 | `PostgresRepo` + `DATABASE_URL` via `NewStoreFromEnv()` |
 | **P2-2** | Stronger advanced-mode classifier | Keyword regex ≠ semantic classification | L | P1-1 | Scoring uses richer signals (or lightweight model); tests cover complex vs simple prompts |
 | **P2-3** | Frontend CI (build + lint + unit) | Workflow is Go-only | S | P0-1 | GH Action runs `npm ci` / `build` / tests on frontend changes |
 | **P2-4** | Auth + chat integration / e2e tests | Unit tests exist; no full flow coverage | M | P0-2, P0-5 | Automated happy path: login → config → stream → usage |

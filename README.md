@@ -136,18 +136,19 @@ Below are the structured, production-grade User Stories ready to be imported int
 * **I want to** define strict Go database access interfaces and instantiate them using an embedded SQLite target
 * **So that** the application boots with zero configurations while allowing seamless migrations to PostgreSQL later.
 * **Acceptance Criteria:**
-  * [ ] Implements `UserRepository` and `SessionRepository` structs passing explicit mock evaluations.
-  * [ ] Database connection driver initializes cleanly from a single local environmental path variable.
-  * [ ] Schema tracking supports incremental user metric additions without dropping active chat contexts.
+  * [x] Implements `UserRepository` and `SessionRepository` structs passing explicit mock evaluations.
+  * [x] Database connection driver initializes cleanly from a single local environmental path variable.
+  * [x] Schema tracking supports incremental user metric additions without dropping active chat contexts.
+  * [x] `DATABASE_URL` selects PostgreSQL via `NewStoreFromEnv()` (SQLite remains the zero-config default).
 
 #### User Story #4: Downstream Multi-Provider SSE Proxying
 * **As an** Active User chatting with the app
 * **I want to** receive immediate word-by-word text streaming from the targeted downstream provider
 * **So that** I do not suffer latency bottlenecks while the system calculates metrics.
 * **Acceptance Criteria:**
-  * [ ] Go handler translates incoming JSON requests into an isolated downstream client call.
-  * [ ] Implements standard streaming parsing loops for Anthropic, Google, and OpenAI text response envelopes.
-  * [ ] Encapsulates ongoing data inside structured `event: text` envelopes delivered seamlessly to the web front-end.
+  * [x] Go handler translates incoming JSON requests into an isolated downstream client call.
+  * [x] Implements standard streaming parsing loops for Anthropic, Google, OpenAI, and Perplexity text response envelopes.
+  * [x] Encapsulates ongoing data inside structured `event: text` envelopes delivered seamlessly to the web front-end.
 
 ---
 

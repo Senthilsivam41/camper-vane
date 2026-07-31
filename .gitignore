@@ -14,3 +14,6 @@ dist/
 .agent/
 .claude/
 .gemini/
+
+# Codegraph local index
+.codegraph/
