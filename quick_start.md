@@ -1,149 +1,224 @@
-# Camper Vane - Quick Start Guide
+# Camper Vane — Quick Start
 
-Camper Vane is an intelligent, cost-aware LLM gateway and interactive web dashboard.
+Run the cost-aware LLM gateway locally: Go API on `:8080`, React UI on `:5173` (Vite proxies `/api` → backend).
 
 ---
 
 ## 1. Prerequisites
 
-Ensure the following tools are installed on your system:
-
-| Software | Minimum Version | Verified Version |
+| Software | Minimum | Notes |
 | :--- | :--- | :--- |
-| **Go** | 1.22+ | 1.25+ |
-| **Node.js** | 18.0+ | 22.0+ |
-| **npm** | 9.0+ | 11.0+ |
-| **Git** | 2.30+ | System default |
-| **GitHub CLI (`gh`)** *(Optional)* | 2.0+ | Required only for automated issue/epic creation |
+| **Go** | 1.22+ | Verified with 1.25+ |
+| **Node.js** | 18+ | Verified with 22+ |
+| **npm** | 9+ | Bundled with Node |
+| **Git** | 2.30+ | |
+| **PostgreSQL** *(optional)* | 14+ | Only if using `DATABASE_URL` |
+| **GitHub CLI (`gh`)** *(optional)* | 2+ | Issue/epic automation script |
 
 ---
 
-## 2. Environment Variables
+## 2. Environment variables
 
 ### Core
 
 | Variable | Default | Description |
 | :--- | :--- | :--- |
-| `PORT` | `8080` | Port for Go HTTP server |
-| `DATABASE_PATH` | `camper_vane.db` | SQLite file path (used when `DATABASE_URL` unset) |
-| `DATABASE_URL` | _(empty)_ | PostgreSQL DSN (e.g. `postgres://user:pass@localhost:5432/camper_vane`). When set, replaces SQLite |
-| `APP_ENV` | `development` | Use `production` to enforce secrets and secure cookies |
-| `JWT_SECRET` | dev default | Required non-default value when `APP_ENV=production` |
+| `PORT` | `8080` | Go HTTP listen port |
+| `DATABASE_PATH` | `camper_vane.db` | SQLite file (ignored when `DATABASE_URL` is set) |
+| `DATABASE_URL` | _(empty)_ | PostgreSQL DSN, e.g. `postgres://user:pass@localhost:5432/camper_vane?sslmode=disable` |
+| `APP_ENV` | `development` | Set `production` to enforce JWT secret + secure defaults |
+| `JWT_SECRET` | built-in dev secret | **Required** non-default value when `APP_ENV=production` |
 | `COOKIE_SECURE` | `true` in prod | Set `true` behind HTTPS |
-| `FRONTEND_URL` | `http://localhost:5173` | SPA URL used after OAuth redirect |
-| `OAUTH_REDIRECT_URI` | `http://localhost:5173/api/v1/auth/callback` | Must match IdP app settings (Vite proxies `/api`) |
+| `FRONTEND_URL` | `http://localhost:5173` | Redirect target after real OAuth callback |
+| `OAUTH_REDIRECT_URI` | `http://localhost:5173/api/v1/auth/callback` | Must match IdP app config (Vite proxies `/api`) |
 
 ### Identity (OAuth)
 
 | Variable | Description |
 | :--- | :--- |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth app credentials |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials |
-| `ALLOW_MOCK_AUTH` | `true`/`false`. Default: mock allowed in non-prod when no IdP credentials are set |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth app |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app |
+| `ALLOW_MOCK_AUTH` | `true` / `false`. Default: mock allowed in non-prod when no IdP credentials are set |
 
 ### Provider credentials (server-held only)
 
-Users never enter provider API keys in the UI. Configure secrets on the server:
+Users never enter these in the UI.
 
-| Variable | Description |
+| Variable | Models |
 | :--- | :--- |
-| `OPENAI_API_KEY` | OpenAI / GPT models |
-| `ANTHROPIC_API_KEY` | Claude models |
-| `GEMINI_API_KEY` | Gemini models |
-| `PERPLEXITY_API_KEY` | Perplexity / Sonar models |
-| `ALLOW_MOCK_PROVIDERS` | Default `true` outside production. In production, missing keys fail loudly (no silent mock) |
+| `OPENAI_API_KEY` | `gpt-*` / OpenAI |
+| `ANTHROPIC_API_KEY` | `claude-*` |
+| `GEMINI_API_KEY` | `gemini-*` |
+| `PERPLEXITY_API_KEY` | `sonar*` / `perplexity*` |
+| `ALLOW_MOCK_PROVIDERS` | Default `true` outside production. When `false` (or production default), missing keys **fail** instead of silent mock streams |
 
 ---
 
-## 3. Installation & Local Execution
+## 3. Install & run
 
-### Step 1: Clone Repository
+### Clone
+
 ```bash
 git clone https://github.com/Senthilsivam41/camper-vane.git
 cd camper-vane
 git checkout feature/epic-4-frontend-presentation
 ```
 
-### Step 2: Backend Setup & Execution (Go Core)
+### Backend
 
 ```bash
 go mod tidy
-go test ./... -v
+go test ./...
 go run ./cmd/server/main.go
 ```
-*Server runs at `http://localhost:8080`.*
 
-Optional production-like start:
+Server: `http://localhost:8080`.
+
+### Frontend
+
+```bash
+npm --prefix frontend install
+npm --prefix frontend run dev
+```
+
+UI: `http://localhost:5173` (API calls to `/api/*` proxy to `:8080`).
+
+Production UI bundle:
+
+```bash
+npm --prefix frontend run build
+```
+
+### Local happy path (no cloud keys)
+
+1. Start backend + frontend (commands above).
+2. Open the UI → **Continue with local mock auth**.
+3. Send a chat prompt → metrics panel shows negotiated model; stream uses mock provider text.
+4. **Log out** clears the session cookie.
+
+### Production-like start
+
 ```bash
 export APP_ENV=production
 export JWT_SECRET='replace-with-long-random-secret'
 export COOKIE_SECURE=true
 export ALLOW_MOCK_AUTH=false
 export ALLOW_MOCK_PROVIDERS=false
+export GOOGLE_CLIENT_ID=...
+export GOOGLE_CLIENT_SECRET=...
+# and/or GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
 export OPENAI_API_KEY=...
 export ANTHROPIC_API_KEY=...
 export GEMINI_API_KEY=...
+export PERPLEXITY_API_KEY=...
 go run ./cmd/server/main.go
 ```
 
-### Step 3: Frontend Setup & Execution (React + Vite)
+### PostgreSQL instead of SQLite
 
 ```bash
-npm --prefix frontend install
-npm --prefix frontend run dev
+export DATABASE_URL='postgres://user:pass@localhost:5432/camper_vane?sslmode=disable'
+go run ./cmd/server/main.go
 ```
-*UI runs at `http://localhost:5173` (API proxied to `:8080`).*
+
+Live store contract test (optional):
 
 ```bash
-npm --prefix frontend run build
+export TEST_DATABASE_URL="$DATABASE_URL"
+go test ./internal/db -run Postgres -count=1
 ```
 
 ---
 
-## 4. API & Authentication Flow Testing
+## 4. API cookbook
 
-### Mock auth (local, when IdP credentials are unset):
+### Auth status (no side effects)
+
 ```bash
-curl -i -H 'Accept: application/json' \
+curl -s "http://localhost:8080/api/v1/auth/login?intent=status" | jq
+```
+
+### Mock login (sets `session_token` cookie)
+
+```bash
+curl -i -c cookies.txt -H 'Accept: application/json' \
   "http://localhost:8080/api/v1/auth/callback?code=mock_code&mock_user_id=dev_user_1&format=json"
 ```
-*Response sets `HttpOnly` cookie `session_token` (`Secure` depends on `COOKIE_SECURE` / `APP_ENV`).*
 
-### Start OAuth login (returns IdP URL when credentials are configured):
+### Real OAuth start (needs IdP credentials)
+
 ```bash
-curl -i "http://localhost:8080/api/v1/auth/login?provider=google"
+curl -s "http://localhost:8080/api/v1/auth/login?provider=google" | jq
+# Open auth_url in a browser; callback sets cookie and redirects to FRONTEND_URL
 ```
 
-### Get User Config:
+### Current user / config
+
 ```bash
-curl -i -b "session_token=<JWT_TOKEN_FROM_COOKIE>" "http://localhost:8080/api/v1/user/config"
+curl -s -b cookies.txt "http://localhost:8080/api/v1/auth/me" | jq
+curl -s -b cookies.txt "http://localhost:8080/api/v1/user/config" | jq
 ```
 
-### Update User Preferences:
+### Update preferences
+
 ```bash
-curl -i -X PUT \
-  -b "session_token=<JWT_TOKEN_FROM_COOKIE>" \
+curl -s -b cookies.txt -X PUT \
   -H "Content-Type: application/json" \
   -d '{
     "daily_token_cap": 75000,
     "routing_strategy": "advanced",
-    "preferred_models": ["claude-3-5-sonnet", "gpt-4o"]
+    "preferred_models": ["claude-3-5-sonnet", "gpt-4o", "sonar"]
   }' \
-  "http://localhost:8080/api/v1/user/config"
+  "http://localhost:8080/api/v1/user/config" | jq
 ```
 
-### Logout:
+### Chat stream (SSE)
+
 ```bash
-curl -i -X POST -b "session_token=<JWT_TOKEN_FROM_COOKIE>" \
-  "http://localhost:8080/api/v1/auth/logout"
+curl -N -b cookies.txt -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "demo-session",
+    "prompt": "Explain Go channels briefly",
+    "model": ""
+  }' \
+  "http://localhost:8080/api/v1/chat/stream"
+```
+
+Expect event sequence: `metrics` → `text`* → `final_usage` (or `error` if provider misconfigured in fail-loud mode).
+
+### Logout
+
+```bash
+curl -i -b cookies.txt -X POST "http://localhost:8080/api/v1/auth/logout"
 ```
 
 ---
 
-## 5. Repository Automation Scripts
+## 5. OAuth app setup (optional)
 
-To automatically create GitHub Epics, User Stories, and Milestones in your repo:
+1. Create Google and/or GitHub OAuth apps.
+2. Set authorized redirect URI to `OAUTH_REDIRECT_URI` (default `http://localhost:5173/api/v1/auth/callback`).
+3. Export client ID/secret env vars and restart the Go server.
+4. In the UI, use **Sign in with Google** / **Sign in with GitHub**.
+
+---
+
+## 6. Repo automation
+
+Create GitHub epics / stories / milestones:
+
 ```bash
 python3 scripts/setup_github_issues.py
 ```
-*(Requires `gh auth login` with `repo` scope)*
+
+Requires `gh auth login` with `repo` scope.
+
+---
+
+## 7. Related docs
+
+| Doc | Purpose |
+| :--- | :--- |
+| [README.md](README.md) | Product overview, architecture, story status |
+| [BACKLOG.md](BACKLOG.md) | Prioritized remaining work (P0–P2) |
