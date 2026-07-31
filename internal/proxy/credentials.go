@@ -9,9 +9,13 @@ import (
 
 var allowMockProviders = true // default for tests/local until InitCredentialsFromEnv runs
 
+// Credential model (P0-4):
+//   - Server-held secrets only: OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY.
+//   - UI never collects provider keys (zero-trust toward end users).
+//   - Development: missing keys → MockClient stream.
+//   - Production (or ALLOW_MOCK_PROVIDERS=false): missing keys → hard error (no silent mock).
+
 // InitCredentialsFromEnv configures whether missing provider API keys may fall back to MockClient.
-// Model: server-held secrets only (OPENAI_API_KEY, ANTHROPIC_API_KEY, GEMINI_API_KEY).
-// End users never supply provider keys. In production, missing keys fail loudly.
 func InitCredentialsFromEnv() {
 	flag := strings.ToLower(strings.TrimSpace(os.Getenv("ALLOW_MOCK_PROVIDERS")))
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))

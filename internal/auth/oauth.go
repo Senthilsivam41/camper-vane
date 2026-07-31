@@ -20,6 +20,10 @@ const (
 	OAuthStateCookie = "oauth_state"
 	defaultFrontend  = "http://localhost:5173"
 	defaultRedirect  = "http://localhost:5173/api/v1/auth/callback"
+
+	defaultGoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo"
+	defaultGitHubUserURL     = "https://api.github.com/user"
+	defaultGitHubEmailURL    = "https://api.github.com/user/emails"
 )
 
 type OAuthIdentity struct {
@@ -35,6 +39,11 @@ type OAuthManager struct {
 	frontendURL  string
 	redirectURI  string
 	allowMock    bool
+
+	httpClient          *http.Client
+	googleUserInfoURL   string
+	githubUserURL       string
+	githubEmailURL      string
 }
 
 func NewOAuthManagerFromEnv() *OAuthManager {
@@ -48,8 +57,11 @@ func NewOAuthManagerFromEnv() *OAuthManager {
 	}
 
 	m := &OAuthManager{
-		frontendURL: strings.TrimRight(frontendURL, "/"),
-		redirectURI: redirectURI,
+		frontendURL:       strings.TrimRight(frontendURL, "/"),
+		redirectURI:       redirectURI,
+		googleUserInfoURL: defaultGoogleUserInfoURL,
+		githubUserURL:     defaultGitHubUserURL,
+		githubEmailURL:    defaultGitHubEmailURL,
 	}
 
 	if cid, secret := os.Getenv("GOOGLE_CLIENT_ID"), os.Getenv("GOOGLE_CLIENT_SECRET"); cid != "" && secret != "" {
@@ -84,6 +96,13 @@ func NewOAuthManagerFromEnv() *OAuthManager {
 	}
 
 	return m
+}
+
+func (m *OAuthManager) client() *http.Client {
+	if m.httpClient != nil {
+		return m.httpClient
+	}
+	return http.DefaultClient
 }
 
 func (m *OAuthManager) AllowMock() bool {
@@ -145,6 +164,7 @@ func (m *OAuthManager) Exchange(ctx context.Context, provider, code string) (*OA
 		return nil, err
 	}
 
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, m.client())
 	token, err := cfg.Exchange(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("token exchange failed: %w", err)
@@ -152,22 +172,27 @@ func (m *OAuthManager) Exchange(ctx context.Context, provider, code string) (*OA
 
 	switch strings.ToLower(provider) {
 	case "google":
-		return fetchGoogleIdentity(ctx, token)
+		return m.fetchGoogleIdentity(ctx, token)
 	case "github":
-		return fetchGitHubIdentity(ctx, token)
+		return m.fetchGitHubIdentity(ctx, token)
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", provider)
 	}
 }
 
-func fetchGoogleIdentity(ctx context.Context, token *oauth2.Token) (*OAuthIdentity, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://www.googleapis.com/oauth2/v2/userinfo", nil)
+func (m *OAuthManager) fetchGoogleIdentity(ctx context.Context, token *oauth2.Token) (*OAuthIdentity, error) {
+	userInfoURL := m.googleUserInfoURL
+	if userInfoURL == "" {
+		userInfoURL = defaultGoogleUserInfoURL
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, userInfoURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := m.client().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -203,15 +228,20 @@ func fetchGoogleIdentity(ctx context.Context, token *oauth2.Token) (*OAuthIdenti
 	}, nil
 }
 
-func fetchGitHubIdentity(ctx context.Context, token *oauth2.Token) (*OAuthIdentity, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user", nil)
+func (m *OAuthManager) fetchGitHubIdentity(ctx context.Context, token *oauth2.Token) (*OAuthIdentity, error) {
+	userURL := m.githubUserURL
+	if userURL == "" {
+		userURL = defaultGitHubUserURL
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, userURL, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := m.client().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -237,7 +267,7 @@ func fetchGitHubIdentity(ctx context.Context, token *oauth2.Token) (*OAuthIdenti
 
 	email := info.Email
 	if email == "" {
-		email, _ = fetchGitHubPrimaryEmail(ctx, token)
+		email, _ = m.fetchGitHubPrimaryEmail(ctx, token)
 	}
 	if email == "" {
 		email = fmt.Sprintf("%s@users.noreply.github.com", info.Login)
@@ -256,15 +286,20 @@ func fetchGitHubIdentity(ctx context.Context, token *oauth2.Token) (*OAuthIdenti
 	}, nil
 }
 
-func fetchGitHubPrimaryEmail(ctx context.Context, token *oauth2.Token) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.github.com/user/emails", nil)
+func (m *OAuthManager) fetchGitHubPrimaryEmail(ctx context.Context, token *oauth2.Token) (string, error) {
+	emailURL := m.githubEmailURL
+	if emailURL == "" {
+		emailURL = defaultGitHubEmailURL
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, emailURL, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+token.AccessToken)
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := m.client().Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -274,9 +309,9 @@ func fetchGitHubPrimaryEmail(ctx context.Context, token *oauth2.Token) (string, 
 	}
 
 	var emails []struct {
-		Email   string `json:"email"`
-		Primary bool   `json:"primary"`
-		Verified bool  `json:"verified"`
+		Email    string `json:"email"`
+		Primary  bool   `json:"primary"`
+		Verified bool   `json:"verified"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&emails); err != nil {
 		return "", err
