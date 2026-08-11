@@ -116,9 +116,10 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 
 	_ = h.sessionRepo.AppendToSession(r.Context(), req.SessionID, db.SessionMessage{
 		SessionID: req.SessionID,
+		UserID:    userID,
 		Role:      "user",
 		Content:   req.Prompt,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 	})
 
 	client := proxy.GetProviderClient(decision.SelectedModel)
@@ -174,20 +175,21 @@ func (h *ChatStreamHandler) HandleStream(w http.ResponseWriter, r *http.Request)
 
 	_ = h.sessionRepo.AppendToSession(r.Context(), req.SessionID, db.SessionMessage{
 		SessionID: req.SessionID,
+		UserID:    userID,
 		Role:      "assistant",
 		Content:   fullAssistantText,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().UTC(),
 	})
 
 	totalTokens := inputTokens + outputTokens
-	now := time.Now()
+	now := time.Now().UTC()
 	_ = h.userRepo.IncrementDailyUsage(r.Context(), userID, now, totalTokens)
-	updatedDaily, _ := h.userRepo.GetDailyUsage(r.Context(), userID, now)
+	updatedWindow, _ := h.userRepo.GetUsageSince(r.Context(), userID, now.Add(-24*time.Hour))
 
 	finalUsage := FinalUsageEvent{
 		InputTokensConsumed:  inputTokens,
 		OutputTokensConsumed: outputTokens,
-		UpdatedDailyTotal:    updatedDaily,
+		UpdatedDailyTotal:    updatedWindow,
 	}
 	sendSSEEvent(w, flusher, "final_usage", finalUsage)
 }

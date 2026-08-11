@@ -10,10 +10,10 @@ Provider API keys stay on the server. End users never paste them into the UI.
 | :--- | :--- | :--- |
 | **1** Identity & profiles | Google/GitHub OAuth, JWT `HttpOnly` cookie, user config API + settings UI | Done (mock auth when IdP unset) |
 | **2** Proxy & persistence | SQLite / PostgreSQL store, multi-provider SSE (incl. Perplexity) | Done |
-| **3** Routing engine | Daily budget throttle (≥85%), advanced keyword/context classifier | Done (MVP) |
-| **4** Frontend | Chat UI, metrics panel, `useChatSSE` hook, logout | Done (MVP) |
+| **3** Routing engine | Sliding 24h budget throttle, preferred models, cost deltas, semantic classifier | Done |
+| **4** Frontend | Chat UI, metrics panel, sessions, usage on load, SSE auto-retry, logout | Done |
 
-Remaining work is tracked in [`BACKLOG.md`](BACKLOG.md). Local runbook: [`quick_start.md`](quick_start.md).
+Remaining work is tracked in [`BACKLOG.md`](BACKLOG.md). Local runbook: [`quick_start.md`](quick_start.md). Production ops: [`docs/ops.md`](docs/ops.md). Deploy samples: [`deploy/`](deploy/).
 
 ## Stack
 
@@ -30,7 +30,7 @@ Remaining work is tracked in [`BACKLOG.md`](BACKLOG.md). Local runbook: [`quick_
 Browser (Vite :5173)
   └─ /api/* proxied ──► Go server (:8080)
                           ├─ auth (OAuth2 + JWT cookie)
-                          ├─ user config
+                          ├─ user config / usage / sessions
                           ├─ router (simple / advanced)
                           ├─ proxy (OpenAI / Anthropic / Gemini / Perplexity / mock)
                           └─ store (SQLite | Postgres | memory tests)
@@ -39,19 +39,16 @@ Browser (Vite :5173)
 ### Auth model
 - **Identity:** Google or GitHub OAuth when client credentials are configured.
 - **Local/dev:** mock auth when IdP credentials are unset (`ALLOW_MOCK_AUTH` defaults on in development).
-- **Session:** JWT in `session_token` cookie (`HttpOnly`; `Secure` in production).
-- **Provider keys:** server env only (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`). Missing keys mock in development; fail loud when `ALLOW_MOCK_PROVIDERS=false` or `APP_ENV=production`.
+- **Session:** JWT in `session_token` cookie (`HttpOnly`; `Secure` in production; `SameSite` via `COOKIE_SAMESITE`).
+- **Provider keys:** server env only. Missing keys mock in development; fail loud when `ALLOW_MOCK_PROVIDERS=false` or `APP_ENV=production`.
 
 ### Persistence
-`db.NewStoreFromEnv()` selects:
-- **SQLite** via `DATABASE_PATH` (default `camper_vane.db`)
-- **PostgreSQL** via `DATABASE_URL`
-
-Interfaces: `UserRepository`, `SessionRepository`, combined as `Store`. Schema migrations are versioned.
+`db.NewStoreFromEnv()` selects SQLite (`DATABASE_PATH`) or PostgreSQL (`DATABASE_URL`).
 
 ### Routing
-- **Simple / budget:** if daily usage ≥ 85% of cap → force low-cost model (`gemini-1.5-flash`) and set `budget_throttled`.
-- **Advanced:** hydrate last N session messages, score complexity, upgrade/downgrade model.
+- Trailing 24h budget throttle at ≥85% of cap
+- Simple mode → low-cost preferred models
+- Advanced mode → `semantic_heuristic_v2` + preferred premium/low-cost + cost delta
 
 ### SSE events (`POST /api/v1/chat/stream`)
 
@@ -59,8 +56,8 @@ Interfaces: `UserRepository`, `SessionRepository`, combined as `Store`. Schema m
 | :--- | :--- |
 | `metrics` | Selected model, rationale, cost delta, budget flag |
 | `text` | Streaming `text_delta` chunks |
-| `final_usage` | Input/output tokens + updated daily total |
-| `error` | Provider/config failure (no silent mock in prod) |
+| `final_usage` | Input/output tokens + updated trailing-24h total |
+| `error` | Provider/config failure |
 
 ## API surface
 
@@ -72,21 +69,10 @@ Interfaces: `UserRepository`, `SessionRepository`, combined as `Store`. Schema m
 | GET | `/api/v1/auth/me` | Yes | Current user config |
 | POST | `/api/v1/auth/logout` | No | Clears session cookie |
 | GET/PUT | `/api/v1/user/config` | Yes | Daily cap, strategy, preferred models |
+| GET | `/api/v1/user/usage` | Yes | Trailing 24h token usage vs cap |
+| GET | `/api/v1/sessions` | Yes | List user sessions |
+| GET | `/api/v1/sessions/{id}/messages` | Yes | Restore session history |
 | POST | `/api/v1/chat/stream` | Yes | SSE chat stream |
-
-## Project layout
-
-```text
-cmd/server/          HTTP entrypoint
-internal/api/        Auth, user, chat handlers
-internal/auth/       JWT, OAuth, session cookies
-internal/db/         SQLite, Postgres, Memory stores + migrations
-internal/proxy/      Provider adapters + credentials policy
-internal/router/     Budget + complexity routing
-frontend/            React UI (chat, metrics, settings)
-BACKLOG.md           Prioritized remaining work
-quick_start.md       Install / env / curl cookbook
-```
 
 ## Quick start
 
@@ -104,55 +90,58 @@ npm --prefix frontend run dev
 
 Open `http://localhost:5173`. Use **Continue with local mock auth** when OAuth client IDs are not set.
 
-Full env tables, production flags, Postgres DSN, and curl examples: **[quick_start.md](quick_start.md)**.
+See **[quick_start.md](quick_start.md)** and **[docs/ops.md](docs/ops.md)**.
 
-## Functional requirements (source of truth)
-
-### Philosophy
-- Contract-first FE/BE boundaries
-- Zero-trust toward end users for provider keys (server-held secrets)
-- Pluggable persistence (SQLite → PostgreSQL)
-
-### Dual-tier optimization
-1. **Simple / volumetric:** daily token cap; throttle at ≥85%
-2. **Advanced:** session context + complexity classification → premium vs lightweight models
-
-### UI metrics panel
-Active model badge, daily usage gauge, routing rationale / estimated cost delta under the prompt box.
-
-### Repository contracts
-
-```go
-type UserRepository interface {
-    GetUserConfig(ctx context.Context, userID string) (*UserConfig, error)
-    UpdateUserConfig(ctx context.Context, config *UserConfig) error
-    GetDailyUsage(ctx context.Context, userID string, date time.Time) (int64, error)
-    IncrementDailyUsage(ctx context.Context, userID string, date time.Time, tokens int64) error
-}
-
-type SessionRepository interface {
-    GetSessionHistory(ctx context.Context, sessionID string, limit int) ([]SessionMessage, error)
-    AppendToSession(ctx context.Context, sessionID string, msg SessionMessage) error
-}
-```
-
-## User stories
+## User stories & acceptance criteria
 
 ### Epic 1: Identity & Profile Foundations
-- **#1 OAuth2 handshake** — `[x]` callback exchange, HttpOnly cookie (`Secure` in prod), profile provision (mock path for local)
-- **#2 User preferences API** — `[x]` `PUT /api/v1/user/config` + settings UI
+
+#### #1 OAuth2 Handshake
+- [x] `/api/v1/auth/callback` handles token exchange (real IdP or mock)
+- [x] Session token stored via `HttpOnly` cookie (`Secure` in production)
+- [x] First-time login provisions default profile + daily token cap
+
+#### #2 User Preferences Management API
+- [x] `PUT /api/v1/user/config` endpoint
+- [x] Validation rejects negative caps / invalid strategies
+- [x] Frontend settings UI saves with confirmation
 
 ### Epic 2: Proxy Layer & Persistence
-- **#3 Pluggable store** — `[x]` SQLite + Postgres + Memory; env-driven `NewStoreFromEnv()`
-- **#4 Multi-provider SSE** — `[x]` OpenAI, Anthropic, Gemini, Perplexity + structured SSE events
+
+#### #3 Pluggable Core Repository
+- [x] `UserRepository` / `SessionRepository` (+ `Store`) with SQLite + Memory contract tests
+- [x] Env-driven init (`DATABASE_PATH` / `DATABASE_URL`)
+- [x] Versioned schema migrations without dropping chat context
+- [x] PostgreSQL implementation via `NewStoreFromEnv()`
+
+#### #4 Downstream Multi-Provider SSE Proxying
+- [x] JSON request → isolated provider client call
+- [x] Streaming parsers for OpenAI, Anthropic, Gemini, Perplexity
+- [x] Structured `event: text` (plus `metrics` / `final_usage` / `error`) to the frontend
 
 ### Epic 3: Intelligence & Optimization
-- **#5 Simple budget router** — `[x]` daily usage check, ≥85% throttle, `budget_throttled` in metrics
-- **#6 Advanced classifier** — `[x]` keyword/context MVP (stronger semantic scoring still in backlog)
+
+#### #5 Simple Mode Budget-Aware Router
+- [x] Every prompt checks trailing-24h usage
+- [x] ≥85% of cap forces low-cost preferred model
+- [x] `budget_throttled` flag in `metrics` event
+
+#### #6 Advanced Mode Semantic & Contextual Classifier
+- [x] `semantic_heuristic_v2` analytics module (centroids + structural signals)
+- [x] High-complexity prompts route to premium preferred models
+- [x] Session history hydration influences scoring / topic continuity
 
 ### Epic 4: Frontend Presentation
-- **#7 Metrics sub-panel** — `[x]` model badge, usage bar, rationale
-- **#8 SSE hook** — `[x]` `useChatSSE` handles `metrics` / `text` / `final_usage` / `error` (auto-retry still in backlog)
+
+#### #7 Metric Sub-Panel
+- [x] Active model badge (provider-colored)
+- [x] Trailing-24h usage gauge (loads on open via `/user/usage`)
+- [x] Optimization rationale + cost delta from SSE `metrics`
+
+#### #8 Unified SSE Event Consumption Hook
+- [x] Sequential event parsing without dropped deltas
+- [x] Branches on `metrics` / `text` / `final_usage` / `error`
+- [x] Auto-retry with backoff on transient disconnects
 
 ## License
 

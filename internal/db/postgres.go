@@ -111,11 +111,30 @@ func (r *PostgresRepo) IncrementDailyUsage(ctx context.Context, userID string, d
 	if err != nil {
 		return fmt.Errorf("failed to increment daily usage: %w", err)
 	}
+	_, err = r.db.ExecContext(ctx,
+		`INSERT INTO usage_events (user_id, tokens, created_at) VALUES ($1, $2, $3)`,
+		userID, tokens, date.UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to record usage event: %w", err)
+	}
 	return nil
 }
 
+func (r *PostgresRepo) GetUsageSince(ctx context.Context, userID string, since time.Time) (int64, error) {
+	var total sql.NullInt64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(tokens), 0) FROM usage_events WHERE user_id = $1 AND created_at >= $2`,
+		userID, since.UTC(),
+	).Scan(&total)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query usage window: %w", err)
+	}
+	return total.Int64, nil
+}
+
 func (r *PostgresRepo) GetSessionHistory(ctx context.Context, sessionID string, limit int) ([]SessionMessage, error) {
-	query := `SELECT session_id, role, content, timestamp FROM session_messages WHERE session_id = $1 ORDER BY id DESC LIMIT $2`
+	query := `SELECT session_id, COALESCE(user_id, ''), role, content, timestamp FROM session_messages WHERE session_id = $1 ORDER BY id DESC LIMIT $2`
 	rows, err := r.db.QueryContext(ctx, query, sessionID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query session history: %w", err)
@@ -125,7 +144,7 @@ func (r *PostgresRepo) GetSessionHistory(ctx context.Context, sessionID string, 
 	var msgs []SessionMessage
 	for rows.Next() {
 		var m SessionMessage
-		if err := rows.Scan(&m.SessionID, &m.Role, &m.Content, &m.Timestamp); err != nil {
+		if err := rows.Scan(&m.SessionID, &m.UserID, &m.Role, &m.Content, &m.Timestamp); err != nil {
 			return nil, err
 		}
 		msgs = append(msgs, m)
@@ -137,12 +156,54 @@ func (r *PostgresRepo) GetSessionHistory(ctx context.Context, sessionID string, 
 }
 
 func (r *PostgresRepo) AppendToSession(ctx context.Context, sessionID string, msg SessionMessage) error {
-	query := `INSERT INTO session_messages (session_id, role, content, timestamp) VALUES ($1, $2, $3, $4)`
-	_, err := r.db.ExecContext(ctx, query, sessionID, msg.Role, msg.Content, msg.Timestamp)
+	ts := msg.Timestamp
+	if ts.IsZero() {
+		ts = time.Now().UTC()
+	}
+	query := `INSERT INTO session_messages (session_id, user_id, role, content, timestamp) VALUES ($1, $2, $3, $4, $5)`
+	_, err := r.db.ExecContext(ctx, query, sessionID, msg.UserID, msg.Role, msg.Content, ts)
 	if err != nil {
 		return fmt.Errorf("failed to append session message: %w", err)
 	}
 	return nil
+}
+
+func (r *PostgresRepo) ListSessions(ctx context.Context, userID string, limit int) ([]SessionSummary, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	query := `
+	SELECT session_id,
+	       MAX(timestamp) AS updated_at,
+	       COUNT(*) AS message_count,
+	       COALESCE((
+	         SELECT content FROM session_messages sm2
+	         WHERE sm2.session_id = sm.session_id AND sm2.user_id = sm.user_id
+	         ORDER BY sm2.id ASC LIMIT 1
+	       ), '') AS preview
+	FROM session_messages sm
+	WHERE user_id = $1
+	GROUP BY session_id
+	ORDER BY updated_at DESC
+	LIMIT $2`
+	rows, err := r.db.QueryContext(ctx, query, userID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []SessionSummary
+	for rows.Next() {
+		var s SessionSummary
+		if err := rows.Scan(&s.SessionID, &s.UpdatedAt, &s.MessageCount, &s.Preview); err != nil {
+			return nil, err
+		}
+		if len(s.Preview) > 80 {
+			s.Preview = s.Preview[:80] + "…"
+		}
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 func runPostgresMigrations(db *sql.DB) error {
@@ -190,6 +251,21 @@ func runPostgresMigrations(db *sql.DB) error {
 			SQL: `
 			ALTER TABLE session_messages ADD COLUMN IF NOT EXISTS model TEXT DEFAULT '';
 			ALTER TABLE session_messages ADD COLUMN IF NOT EXISTS tokens_consumed BIGINT DEFAULT 0;
+			`,
+		},
+		{
+			Version: 3,
+			Name:    "usage_events_and_session_user",
+			SQL: `
+			CREATE TABLE IF NOT EXISTS usage_events (
+				id BIGSERIAL PRIMARY KEY,
+				user_id TEXT NOT NULL,
+				tokens BIGINT NOT NULL,
+				created_at TIMESTAMPTZ NOT NULL
+			);
+			CREATE INDEX IF NOT EXISTS idx_usage_events_user_time ON usage_events(user_id, created_at);
+			ALTER TABLE session_messages ADD COLUMN IF NOT EXISTS user_id TEXT DEFAULT '';
+			CREATE INDEX IF NOT EXISTS idx_session_messages_user ON session_messages(user_id, session_id);
 			`,
 		},
 	}

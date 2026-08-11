@@ -48,6 +48,21 @@ var migrations = []Migration{
 		ALTER TABLE session_messages ADD COLUMN tokens_consumed INTEGER DEFAULT 0;
 		`,
 	},
+	{
+		Version: 3,
+		Name:    "usage_events_and_session_user",
+		SQL: `
+		CREATE TABLE IF NOT EXISTS usage_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id TEXT NOT NULL,
+			tokens INTEGER NOT NULL,
+			created_at DATETIME NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_usage_events_user_time ON usage_events(user_id, created_at);
+		ALTER TABLE session_messages ADD COLUMN user_id TEXT DEFAULT '';
+		CREATE INDEX IF NOT EXISTS idx_session_messages_user ON session_messages(user_id, session_id);
+		`,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {

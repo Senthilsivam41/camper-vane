@@ -65,10 +65,11 @@ func TestRouterAdvancedModeClassifier(t *testing.T) {
 		UserID:          "user-adv",
 		DailyTokenCap:   100000,
 		RoutingStrategy: "advanced",
+		PreferredModels: []string{"gemini-1.5-flash", "claude-3-5-sonnet"},
 	}
 	_ = repo.UpdateUserConfig(ctx, cfg)
 
-	// Test 1: High complexity code prompt -> Upgraded to premium model
+	// Test 1: High complexity code prompt -> Upgraded to premium preferred model
 	codeDecision, err := router.EvaluateRoute(ctx, RouteRequest{
 		UserID:         "user-adv",
 		SessionID:      "sess-adv-1",
@@ -81,18 +82,53 @@ func TestRouterAdvancedModeClassifier(t *testing.T) {
 	if codeDecision.SelectedModel != "claude-3-5-sonnet" {
 		t.Errorf("expected upgrade to claude-3-5-sonnet, got %s", codeDecision.SelectedModel)
 	}
+	if codeDecision.EstimatedCostDelta == "" || codeDecision.EstimatedCostDelta[0] != '+' {
+		t.Errorf("expected positive cost delta, got %s", codeDecision.EstimatedCostDelta)
+	}
 
-	// Test 2: Low complexity casual prompt -> Downshifted to lightweight model
+	// Test 2: Low complexity casual prompt -> Downshifted to lightweight preferred model
 	simpleDecision, err := router.EvaluateRoute(ctx, RouteRequest{
 		UserID:         "user-adv",
 		SessionID:      "sess-adv-2",
 		Prompt:         "Hi, hello! What is 2 + 2?",
-		RequestedModel: "gpt-4o",
+		RequestedModel: "",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if simpleDecision.SelectedModel != "gemini-1.5-flash" {
 		t.Errorf("expected downshift to gemini-1.5-flash, got %s", simpleDecision.SelectedModel)
+	}
+}
+
+func TestRouterHonorsPreferredModelsSimpleMode(t *testing.T) {
+	repo, err := db.NewSQLiteRepo(":memory:")
+	if err != nil {
+		t.Fatalf("db: %v", err)
+	}
+	defer repo.Close()
+	ctx := context.Background()
+	r := NewRouter(repo, repo)
+
+	_ = repo.UpdateUserConfig(ctx, &db.UserConfig{
+		UserID:          "user-simple",
+		DailyTokenCap:   100000,
+		RoutingStrategy: "simple",
+		PreferredModels: []string{"gpt-4o-mini", "claude-3-5-sonnet"},
+	})
+
+	d, err := r.EvaluateRoute(ctx, RouteRequest{
+		UserID:    "user-simple",
+		SessionID: "s1",
+		Prompt:    "Design complex distributed architecture with goroutines",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.SelectedModel != "gpt-4o-mini" {
+		t.Fatalf("simple mode should pick low-cost preferred, got %s", d.SelectedModel)
+	}
+	if d.BudgetThrottled {
+		t.Fatal("should not throttle under cap")
 	}
 }
