@@ -28,6 +28,8 @@ Same-origin (or proxied `/api`) is required so the `session_token` cookie is sen
 | :--- | :--- |
 | `JWT_SECRET` | Non-default HMAC secret for session JWTs (server refuses to start with empty/default) |
 | `COOKIE_SECURE` | Should be `true` behind HTTPS |
+| `COOKIE_SAMESITE` | `lax` (default), `strict`, or `none` (forces Secure; required for cross-site cookies) |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated browser origins allowed for credentialed API calls (empty = CORS off) |
 | `ALLOW_MOCK_AUTH` | Must be `false` (or leave default: mock disabled when IdP credentials exist / production) |
 | `ALLOW_MOCK_PROVIDERS` | Must be `false` so missing provider keys fail loud instead of mock streams |
 
@@ -134,7 +136,27 @@ SSE notes:
 - Keep long read timeouts
 - Prefer HTTP/1.1 to the upstream for streaming
 
-If FE and API must be on different origins, set CORS + cookie `SameSite=None; Secure` deliberately (not enabled by default). Prefer same-origin proxy instead.
+### Cross-origin FE/API (optional)
+
+Prefer same-origin reverse proxy. If the SPA and API must be on different origins:
+
+```bash
+export CORS_ALLOWED_ORIGINS='https://app.example.com'
+export COOKIE_SAMESITE=none   # forces Secure cookies
+export COOKIE_SECURE=true
+export FRONTEND_URL='https://app.example.com'
+export OAUTH_REDIRECT_URI='https://api.example.com/api/v1/auth/callback'
+```
+
+Behavior:
+- `CORS_ALLOWED_ORIGINS` empty → no CORS headers (same-origin / proxied `/api` mode)
+- Listed origin + credentialed fetch → `Access-Control-Allow-Origin` echoes that origin + `Allow-Credentials: true`
+- `OPTIONS` preflight answered with `204`
+- `COOKIE_SAMESITE=none` is required for cross-site cookie sends; browsers also require `Secure`
+
+Deploy example configs under `deploy/`:
+- [`deploy/Caddyfile`](../deploy/Caddyfile)
+- [`deploy/nginx.conf`](../deploy/nginx.conf)
 
 ---
 

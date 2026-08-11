@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -10,8 +11,9 @@ import (
 const defaultDevJWTSecret = "camper-vane-dev-secret-key-32bytes!"
 
 var (
-	cookieSecure bool
-	appEnv       string
+	cookieSecure   bool
+	cookieSameSite http.SameSite
+	appEnv         string
 )
 
 // InitFromEnv configures JWT signing and cookie security from environment.
@@ -45,12 +47,36 @@ func InitFromEnv() error {
 		cookieSecure = appEnv == "production"
 	}
 
-	log.Printf("auth: env=%s cookie_secure=%v", appEnv, cookieSecure)
+	sameSiteFlag := strings.ToLower(strings.TrimSpace(os.Getenv("COOKIE_SAMESITE")))
+	switch sameSiteFlag {
+	case "strict":
+		cookieSameSite = http.SameSiteStrictMode
+	case "none":
+		cookieSameSite = http.SameSiteNoneMode
+		// Browsers require Secure when SameSite=None.
+		if !cookieSecure {
+			log.Printf("auth: COOKIE_SAMESITE=none forces COOKIE_SECURE=true")
+			cookieSecure = true
+		}
+	case "lax", "":
+		cookieSameSite = http.SameSiteLaxMode
+	default:
+		return fmt.Errorf("COOKIE_SAMESITE must be lax, strict, or none (got %q)", sameSiteFlag)
+	}
+
+	log.Printf("auth: env=%s cookie_secure=%v cookie_samesite=%s", appEnv, cookieSecure, sameSiteName(cookieSameSite))
 	return nil
 }
 
 func CookieSecure() bool {
 	return cookieSecure
+}
+
+func CookieSameSite() http.SameSite {
+	if cookieSameSite == 0 {
+		return http.SameSiteLaxMode
+	}
+	return cookieSameSite
 }
 
 func AppEnv() string {
@@ -59,4 +85,15 @@ func AppEnv() string {
 
 func IsProduction() bool {
 	return appEnv == "production"
+}
+
+func sameSiteName(m http.SameSite) string {
+	switch m {
+	case http.SameSiteStrictMode:
+		return "strict"
+	case http.SameSiteNoneMode:
+		return "none"
+	default:
+		return "lax"
+	}
 }

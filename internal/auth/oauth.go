@@ -337,7 +337,7 @@ func SetOAuthStateCookie(w http.ResponseWriter, state string) {
 		Expires:  time.Now().Add(10 * time.Minute),
 		HttpOnly: true,
 		Secure:   cookieSecure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: CookieSameSite(),
 	})
 }
 
@@ -349,6 +349,6 @@ func ClearOAuthStateCookie(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		HttpOnly: true,
 		Secure:   cookieSecure,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: CookieSameSite(),
 	})
 }

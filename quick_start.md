@@ -29,6 +29,8 @@ Run the cost-aware LLM gateway locally: Go API on `:8080`, React UI on `:5173` (
 | `APP_ENV` | `development` | Set `production` to enforce JWT secret + secure defaults |
 | `JWT_SECRET` | built-in dev secret | **Required** non-default value when `APP_ENV=production` |
 | `COOKIE_SECURE` | `true` in prod | Set `true` behind HTTPS |
+| `COOKIE_SAMESITE` | `lax` | `lax`, `strict`, or `none` (`none` forces Secure; needed for cross-site cookies) |
+| `CORS_ALLOWED_ORIGINS` | _(empty)_ | Comma-separated origins for credentialed CORS; empty disables CORS |
 | `FRONTEND_URL` | `http://localhost:5173` | Redirect target after real OAuth callback |
 | `OAUTH_REDIRECT_URI` | `http://localhost:5173/api/v1/auth/callback` | Must match IdP app config (Vite proxies `/api`) |
 

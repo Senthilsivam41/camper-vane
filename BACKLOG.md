@@ -1,7 +1,7 @@
 # Camper Vane — Prioritized Implementation Backlog
 
 _Last updated: 2026-07-30_  
-_Baseline branch: `feature/epic-4-frontend-presentation` (MVP scaffold complete; `main` not yet merged)_
+_Baseline branch: `feature/epic-4-frontend-presentation` (Epics 1–4 + P0–P2 done except merge; `main` not yet merged)_
 
 Priority legend:
 - **P0** — Blocks real users / production correctness
@@ -47,9 +47,9 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 | **P2-1** | PostgreSQL repository implementation _(done)_ | Pluggable persistence goal | L | P0-1 | `PostgresRepo` + `DATABASE_URL` via `NewStoreFromEnv()` |
 | **P2-2** | Stronger advanced-mode classifier _(done)_ | Keyword-only was too weak | L | P1-1 | Semantic centroid + multi-signal `semantic_heuristic_v2` + table tests |
 | **P2-3** | Frontend CI (build + lint + unit) _(done)_ | Workflow was Go-only | S | P0-1 | `.github/workflows/frontend.yml` runs npm ci / lint / test / build |
-| **P2-4** | Auth + chat integration / e2e tests | Unit tests exist; no full flow coverage | M | P0-2, P0-5 | Automated happy path: login → config → stream → usage |
-| **P2-5** | CORS / reverse-proxy production config | Needed if FE/BE on different origins | S | P0-3 | Documented allowed origins; cookies work cross-origin when intended |
-| **P2-6** | Close README acceptance checkboxes | Tracking hygiene | S | P0–P1 done | All Story #1–#8 ACs verified and checked off in README / GitHub issues |
+| **P2-4** | Auth + chat integration / e2e tests _(done)_ | Needed full-flow coverage | M | P0-2, P0-5 | `TestE2EHappyPath`: login → config → stream → usage → sessions → logout |
+| **P2-5** | CORS / reverse-proxy production config _(done)_ | Cross-origin + deploy samples | S | P0-3 | `CORS_ALLOWED_ORIGINS`, `COOKIE_SAMESITE`, `deploy/` + ops docs |
+| **P2-6** | Close README acceptance checkboxes _(done)_ | Tracking hygiene | S | P0–P1 done | Stories #1–#8 ACs checked in README |
 
 ---
 
@@ -75,29 +75,31 @@ Week 3
   P1-4 Cost estimation
   P1-3 Sliding 24h window
 
-Week 4+
+Week 4+ (done on feature branch)
   P1-7 Perplexity
-  P2-3 Frontend CI
-  P2-4 E2E tests
-  P2-1 Postgres (if scale needed)
-  P2-2 Classifier upgrade
-  P2-5 / P2-6 polish & close ACs
+  P2-1 Postgres · P2-2 Classifier · P2-3 Frontend CI
+  P2-4 E2E · P2-5 CORS/proxy · P2-6 README ACs
+
+Remaining
+  P0-1 Merge feature branch to main
 ```
 
 ---
 
 ## Mapping to README user stories
 
-| Story | Scaffold | Remaining backlog IDs |
+| Story | Status | Notes |
 |---|---|---|
-| #1 OAuth2 Handshake | Mock | P0-2, P0-3 |
-| #2 User Preferences API | Done | P1-1 (consume prefs) |
-| #3 Pluggable SQLite Repo | Done | P2-1 (Postgres) |
-| #4 Multi-provider SSE | Adapters + mock | P0-4, P0-5, P1-7 |
-| #5 Simple Mode Budget Router | Done | P1-3 |
-| #6 Advanced Mode Classifier | Done (`semantic_heuristic_v2`) | — |
-| #7 Metrics Sub-Panel | Done | P1-2 |
-| #8 SSE Consumption Hook | Done | P1-6 |
+| #1 OAuth2 Handshake | Done | Real IdP + mock fallback |
+| #2 User Preferences API | Done | API + settings UI |
+| #3 Pluggable store | Done | SQLite / Postgres / Memory |
+| #4 Multi-provider SSE | Done | OpenAI / Anthropic / Gemini / Perplexity |
+| #5 Simple Mode Budget Router | Done | Trailing 24h + throttle |
+| #6 Advanced Mode Classifier | Done | `semantic_heuristic_v2` |
+| #7 Metrics Sub-Panel | Done | Usage on load + rationale |
+| #8 SSE Consumption Hook | Done | Auto-retry + sessions |
+
+**Still open outside stories:** P0-1 (merge feature branch to `main`).
 
 ---
 
