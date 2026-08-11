@@ -29,14 +29,14 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 
 | ID | Task | Why | Effort | Depends on | Done when |
 |---|---|---|---|---|---|
-| **P1-1** | Honor `preferred_models` in router | User settings are saved but mostly unused in route selection | S | P0-5 | Advanced/simple routing picks from configured preference order when eligible |
-| **P1-2** | Daily usage on page load | Gauge only updates after a completed stream | S | P0-5 | New `GET /api/v1/user/usage` (or embed in `/auth/me`); metrics panel shows current total immediately |
-| **P1-3** | Sliding 24-hour token window | Spec says sliding 24h; store is calendar-day | M | P1-2 | Usage queries last 24h of increments; throttle uses that total |
-| **P1-4** | Real cost delta estimation | `estimated_cost_delta` is hardcoded strings | M | P0-5 | Cost table per model; delta vs baseline model; emitted in `metrics` event |
-| **P1-5** | Session history restore + multi-session | History is persisted server-side but UI always starts empty / single default session | M | P0-5 | List sessions; open session loads history; new session creates distinct `session_id` |
-| **P1-6** | SSE disconnect auto-retry | Story #8 AC requires retry; hook only surfaces error | S | P0-5 | Transient failures retry with backoff; user sees retry status; abort cancels retries |
+| **P1-1** | Honor `preferred_models` in router _(done)_ | Route selection ignored prefs | S | P0-5 | Simple/advanced pick from preference order |
+| **P1-2** | Daily usage on page load _(done)_ | Gauge empty until stream ends | S | P0-5 | `GET /api/v1/user/usage` feeds metrics panel |
+| **P1-3** | Sliding 24-hour token window _(done)_ | Spec says sliding 24h | M | P1-2 | `usage_events` + `GetUsageSince` drive throttle |
+| **P1-4** | Real cost delta estimation _(done)_ | Hardcoded cost strings | M | P0-5 | Cost table vs baseline in `metrics` |
+| **P1-5** | Session history restore + multi-session _(done)_ | UI single default session | M | P0-5 | List/open/new session + history restore |
+| **P1-6** | SSE disconnect auto-retry _(done)_ | Story #8 AC | S | P0-5 | Backoff retries + retry status in UI |
 | **P1-7** | Perplexity provider adapter _(done)_ | Multi-provider SSE gap | M | P0-4 | `GetProviderClient` routes Perplexity/Sonar models |
-| **P1-8** | Env / ops documentation | `quick_start` covers mocks only | S | P0-2, P0-4 | Document OAuth client IDs, JWT secret, provider keys, `DATABASE_PATH`, `PORT`, prod cookie flags |
+| **P1-8** | Env / ops documentation _(done)_ | Ops runbook needed | S | P0-2, P0-4 | `docs/ops.md` + quick_start cover OAuth, JWT, keys, DB, cookies, proxy |
 
 ---
 
@@ -45,8 +45,8 @@ Effort: **S** ≤1 day · **M** 2–3 days · **L** ≈1 week
 | ID | Task | Why | Effort | Depends on | Done when |
 |---|---|---|---|---|---|
 | **P2-1** | PostgreSQL repository implementation _(done)_ | Pluggable persistence goal | L | P0-1 | `PostgresRepo` + `DATABASE_URL` via `NewStoreFromEnv()` |
-| **P2-2** | Stronger advanced-mode classifier | Keyword regex ≠ semantic classification | L | P1-1 | Scoring uses richer signals (or lightweight model); tests cover complex vs simple prompts |
-| **P2-3** | Frontend CI (build + lint + unit) | Workflow is Go-only | S | P0-1 | GH Action runs `npm ci` / `build` / tests on frontend changes |
+| **P2-2** | Stronger advanced-mode classifier _(done)_ | Keyword-only was too weak | L | P1-1 | Semantic centroid + multi-signal `semantic_heuristic_v2` + table tests |
+| **P2-3** | Frontend CI (build + lint + unit) _(done)_ | Workflow was Go-only | S | P0-1 | `.github/workflows/frontend.yml` runs npm ci / lint / test / build |
 | **P2-4** | Auth + chat integration / e2e tests | Unit tests exist; no full flow coverage | M | P0-2, P0-5 | Automated happy path: login → config → stream → usage |
 | **P2-5** | CORS / reverse-proxy production config | Needed if FE/BE on different origins | S | P0-3 | Documented allowed origins; cookies work cross-origin when intended |
 | **P2-6** | Close README acceptance checkboxes | Tracking hygiene | S | P0–P1 done | All Story #1–#8 ACs verified and checked off in README / GitHub issues |
@@ -95,7 +95,7 @@ Week 4+
 | #3 Pluggable SQLite Repo | Done | P2-1 (Postgres) |
 | #4 Multi-provider SSE | Adapters + mock | P0-4, P0-5, P1-7 |
 | #5 Simple Mode Budget Router | Done | P1-3 |
-| #6 Advanced Mode Classifier | Keyword MVP | P1-1, P1-4, P2-2 |
+| #6 Advanced Mode Classifier | Done (`semantic_heuristic_v2`) | — |
 | #7 Metrics Sub-Panel | Done | P1-2 |
 | #8 SSE Consumption Hook | Done | P1-6 |
 

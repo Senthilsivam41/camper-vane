@@ -10,10 +10,10 @@ Provider API keys stay on the server. End users never paste them into the UI.
 | :--- | :--- | :--- |
 | **1** Identity & profiles | Google/GitHub OAuth, JWT `HttpOnly` cookie, user config API + settings UI | Done (mock auth when IdP unset) |
 | **2** Proxy & persistence | SQLite / PostgreSQL store, multi-provider SSE (incl. Perplexity) | Done |
-| **3** Routing engine | Daily budget throttle (≥85%), advanced keyword/context classifier | Done (MVP) |
-| **4** Frontend | Chat UI, metrics panel, `useChatSSE` hook, logout | Done (MVP) |
+| **3** Routing engine | Sliding 24h budget throttle, preferred models, cost deltas, richer classifier | Done |
+| **4** Frontend | Chat UI, metrics panel, sessions, usage on load, SSE auto-retry, logout | Done |
 
-Remaining work is tracked in [`BACKLOG.md`](BACKLOG.md). Local runbook: [`quick_start.md`](quick_start.md).
+Remaining work is tracked in [`BACKLOG.md`](BACKLOG.md). Local runbook: [`quick_start.md`](quick_start.md). Production ops: [`docs/ops.md`](docs/ops.md).
 
 ## Stack
 
@@ -50,8 +50,9 @@ Browser (Vite :5173)
 Interfaces: `UserRepository`, `SessionRepository`, combined as `Store`. Schema migrations are versioned.
 
 ### Routing
-- **Simple / budget:** if daily usage ≥ 85% of cap → force low-cost model (`gemini-1.5-flash`) and set `budget_throttled`.
-- **Advanced:** hydrate last N session messages, score complexity, upgrade/downgrade model.
+- **Sliding 24h budget:** trailing usage from `usage_events`; if ≥ 85% of cap → force low-cost preferred model + `budget_throttled`.
+- **Simple mode:** always prefer low-cost entries from `preferred_models`.
+- **Advanced mode:** hydrate last N session messages, multi-signal complexity score, pick premium/low-cost from preferences, emit real cost delta vs baseline.
 
 ### SSE events (`POST /api/v1/chat/stream`)
 
@@ -72,6 +73,9 @@ Interfaces: `UserRepository`, `SessionRepository`, combined as `Store`. Schema m
 | GET | `/api/v1/auth/me` | Yes | Current user config |
 | POST | `/api/v1/auth/logout` | No | Clears session cookie |
 | GET/PUT | `/api/v1/user/config` | Yes | Daily cap, strategy, preferred models |
+| GET | `/api/v1/user/usage` | Yes | Trailing 24h token usage vs cap |
+| GET | `/api/v1/sessions` | Yes | List user sessions |
+| GET | `/api/v1/sessions/{id}/messages` | Yes | Restore session history |
 | POST | `/api/v1/chat/stream` | Yes | SSE chat stream |
 
 ## Project layout
@@ -147,12 +151,12 @@ type SessionRepository interface {
 - **#4 Multi-provider SSE** — `[x]` OpenAI, Anthropic, Gemini, Perplexity + structured SSE events
 
 ### Epic 3: Intelligence & Optimization
-- **#5 Simple budget router** — `[x]` daily usage check, ≥85% throttle, `budget_throttled` in metrics
-- **#6 Advanced classifier** — `[x]` keyword/context MVP (stronger semantic scoring still in backlog)
+- **#5 Simple budget router** — `[x]` trailing-24h usage, ≥85% throttle, `budget_throttled`, preferred low-cost models
+- **#6 Advanced classifier** — `[x]` `semantic_heuristic_v2` (domain centroids + multi-signal) + history hydration + cost delta + preferred models
 
 ### Epic 4: Frontend Presentation
-- **#7 Metrics sub-panel** — `[x]` model badge, usage bar, rationale
-- **#8 SSE hook** — `[x]` `useChatSSE` handles `metrics` / `text` / `final_usage` / `error` (auto-retry still in backlog)
+- **#7 Metrics sub-panel** — `[x]` model badge, 24h usage bar (loads on open), rationale, cost delta
+- **#8 SSE hook** — `[x]` `useChatSSE` handles `metrics` / `text` / `final_usage` / `error` with auto-retry; multi-session restore
 
 ## License
 

@@ -88,15 +88,19 @@ func exerciseStoreContract(t *testing.T, store Store) {
 	if err != nil || usage != 150 {
 		t.Fatalf("expected usage 150, got %d err=%v", usage, err)
 	}
+	window, err := store.GetUsageSince(ctx, "contract-user", now.Add(-time.Hour))
+	if err != nil || window != 150 {
+		t.Fatalf("expected rolling usage 150, got %d err=%v", window, err)
+	}
 
 	sess := "contract-sess"
 	if err := store.AppendToSession(ctx, sess, SessionMessage{
-		Role: "user", Content: "one", Timestamp: now,
+		UserID: "contract-user", Role: "user", Content: "one", Timestamp: now,
 	}); err != nil {
 		t.Fatalf("AppendToSession: %v", err)
 	}
 	if err := store.AppendToSession(ctx, sess, SessionMessage{
-		Role: "assistant", Content: "two", Timestamp: now.Add(time.Second),
+		UserID: "contract-user", Role: "assistant", Content: "two", Timestamp: now.Add(time.Second),
 	}); err != nil {
 		t.Fatalf("AppendToSession 2: %v", err)
 	}
@@ -107,5 +111,13 @@ func exerciseStoreContract(t *testing.T, store Store) {
 	}
 	if hist[0].Content != "one" || hist[1].Content != "two" {
 		t.Fatalf("history not chronological: %+v", hist)
+	}
+
+	sessions, err := store.ListSessions(ctx, "contract-user", 10)
+	if err != nil || len(sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d err=%v", len(sessions), err)
+	}
+	if sessions[0].SessionID != sess || sessions[0].MessageCount != 2 {
+		t.Fatalf("unexpected session summary: %+v", sessions[0])
 	}
 }

@@ -12,6 +12,30 @@ export interface LoginResponse {
   available_providers: string[];
 }
 
+export interface UsageInfo {
+  user_id: string;
+  window_hours: number;
+  tokens_used: number;
+  daily_token_cap: number;
+  utilization_pct: number;
+  as_of: string;
+}
+
+export interface SessionSummary {
+  session_id: string;
+  updated_at: string;
+  message_count: number;
+  preview: string;
+}
+
+export interface SessionMessageDTO {
+  session_id: string;
+  user_id?: string;
+  role: 'user' | 'assistant' | string;
+  content: string;
+  timestamp: string;
+}
+
 export async function fetchUserConfig(): Promise<UserConfig> {
   const res = await fetch('/api/v1/user/config', { credentials: 'include' });
   if (!res.ok) {
@@ -30,6 +54,32 @@ export async function updateUserConfig(config: Partial<UserConfig>): Promise<Use
   if (!res.ok) {
     const errorText = await res.text();
     throw new Error(errorText || `Failed to update config (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchUsage(): Promise<UsageInfo> {
+  const res = await fetch('/api/v1/user/usage', { credentials: 'include' });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch usage (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchSessions(limit = 20): Promise<SessionSummary[]> {
+  const res = await fetch(`/api/v1/sessions?limit=${limit}`, { credentials: 'include' });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch sessions (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchSessionMessages(sessionId: string, limit = 100): Promise<SessionMessageDTO[]> {
+  const res = await fetch(`/api/v1/sessions/${encodeURIComponent(sessionId)}/messages?limit=${limit}`, {
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to fetch session messages (${res.status})`);
   }
   return res.json();
 }

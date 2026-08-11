@@ -172,6 +172,19 @@ curl -s -b cookies.txt -X PUT \
   "http://localhost:8080/api/v1/user/config" | jq
 ```
 
+### Trailing 24h usage
+
+```bash
+curl -s -b cookies.txt "http://localhost:8080/api/v1/user/usage" | jq
+```
+
+### Sessions
+
+```bash
+curl -s -b cookies.txt "http://localhost:8080/api/v1/sessions" | jq
+curl -s -b cookies.txt "http://localhost:8080/api/v1/sessions/demo-session/messages" | jq
+```
+
 ### Chat stream (SSE)
 
 ```bash
@@ -221,4 +234,5 @@ Requires `gh auth login` with `repo` scope.
 | Doc | Purpose |
 | :--- | :--- |
 | [README.md](README.md) | Product overview, architecture, story status |
+| [docs/ops.md](docs/ops.md) | Production env matrix, cookies, reverse proxy, CI |
 | [BACKLOG.md](BACKLOG.md) | Prioritized remaining work (P0–P2) |

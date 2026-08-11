@@ -1,22 +1,26 @@
 import React from 'react';
 import type { MetricsData, FinalUsageData } from '../hooks/useChatSSE';
-import type { UserConfig } from '../services/api';
+import type { UserConfig, UsageInfo } from '../services/api';
 
 interface OptimizationMetricsPanelProps {
   metrics: MetricsData | null;
   finalUsage: FinalUsageData | null;
   userConfig: UserConfig | null;
+  usage: UsageInfo | null;
   status: string;
+  retryCount?: number;
 }
 
 export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> = ({
   metrics,
   finalUsage,
   userConfig,
+  usage,
   status,
+  retryCount = 0,
 }) => {
-  const dailyCap = userConfig?.daily_token_cap || 50000;
-  const currentTotal = finalUsage?.updated_daily_total || 0;
+  const dailyCap = usage?.daily_token_cap || userConfig?.daily_token_cap || 50000;
+  const currentTotal = finalUsage?.updated_daily_total ?? usage?.tokens_used ?? 0;
   const usagePercentage = Math.min(100, Math.round((currentTotal / dailyCap) * 100));
 
   const getModelBadgeStyle = (modelName?: string): React.CSSProperties => {
@@ -26,6 +30,8 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
 
     if (m.includes('claude')) {
       bg = 'var(--purple)';
+    } else if (m.includes('sonar') || m.includes('perplexity')) {
+      bg = 'var(--amber)';
     } else if (m.includes('gpt-4o-mini') || m.includes('mini')) {
       bg = 'var(--amber)';
     } else if (m.includes('gpt-4o') || m.includes('openai')) {
@@ -56,16 +62,15 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
   };
 
   return (
-    <section
-      role="region"
-      aria-label="Optimization & Metrics Area"
-      style={styles.container}
-    >
+    <section role="region" aria-label="Optimization & Metrics Area" style={styles.container}>
       <div style={styles.topRow}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>Active Model:</span>
           {metrics?.selected_model ? (
-            <span style={getModelBadgeStyle(metrics.selected_model)} aria-label={`Negotiated model: ${metrics.selected_model}`}>
+            <span
+              style={getModelBadgeStyle(metrics.selected_model)}
+              aria-label={`Negotiated model: ${metrics.selected_model}`}
+            >
               ● {metrics.selected_model}
             </span>
           ) : (
@@ -76,17 +81,19 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
         </div>
 
         {metrics?.estimated_cost_delta && (
-          <span style={styles.costBadge} aria-label={`Estimated cost savings: ${metrics.estimated_cost_delta}`}>
-            Est. Cost Savings: {metrics.estimated_cost_delta}
+          <span style={styles.costBadge} aria-label={`Estimated cost delta: ${metrics.estimated_cost_delta}`}>
+            Est. Cost Delta: {metrics.estimated_cost_delta}
           </span>
         )}
       </div>
 
-      {/* Volumetric Daily Usage Gauge */}
       <div style={styles.gaugeSection}>
         <div style={styles.gaugeHeader}>
-          <span style={styles.gaugeLabel}>Daily Token Consumption Bar:</span>
-          <span style={styles.gaugeValue} aria-label={`Token consumption: ${currentTotal} of ${dailyCap} tokens, ${usagePercentage} percent`}>
+          <span style={styles.gaugeLabel}>Trailing 24h Token Bar:</span>
+          <span
+            style={styles.gaugeValue}
+            aria-label={`Token consumption: ${currentTotal} of ${dailyCap} tokens, ${usagePercentage} percent`}
+          >
             {currentTotal.toLocaleString()} / {dailyCap.toLocaleString()} tokens ({usagePercentage}%)
           </span>
         </div>
@@ -95,7 +102,7 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
           aria-valuenow={usagePercentage}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label="Daily token budget usage"
+          aria-label="Trailing 24 hour token budget usage"
           style={styles.trackBackground}
         >
           <div
@@ -108,17 +115,18 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
         </div>
       </div>
 
-      {/* Rationale & Optimization Readout */}
       {metrics?.routing_rationale && (
         <div style={styles.rationaleBox} aria-live="polite">
           <span style={styles.rationaleTitle}>Optimization Engine Insight:</span>
           <p style={styles.rationaleText}>{metrics.routing_rationale}</p>
           {metrics.complexity_score !== undefined && (
             <div style={styles.scoreRow}>
-              <span>Analyzed Complexity Score: <strong>{(metrics.complexity_score * 100).toFixed(0)}%</strong></span>
+              <span>
+                Analyzed Complexity Score: <strong>{(metrics.complexity_score * 100).toFixed(0)}%</strong>
+              </span>
               {metrics.budget_throttled && (
                 <span style={styles.throttleAlert} role="alert">
-                  ⚠️ Volumetric Throttled (≥85% Budget Cap)
+                  Volumetric Throttled (≥85% Budget Cap)
                 </span>
               )}
             </div>
@@ -126,9 +134,14 @@ export const OptimizationMetricsPanel: React.FC<OptimizationMetricsPanelProps> =
         </div>
       )}
 
-      {status === 'streaming' && (
+      {(status === 'streaming' || status === 'retrying' || status === 'connecting') && (
         <div style={styles.streamingIndicator} aria-live="polite" aria-busy="true">
-          <span style={styles.dot} className="pulse-dot"></span> SSE Word-by-Word Stream Active...
+          <span style={styles.dot} className="pulse-dot"></span>
+          {status === 'retrying'
+            ? `SSE reconnect attempt ${retryCount}...`
+            : status === 'connecting'
+              ? 'Negotiating route...'
+              : 'SSE Word-by-Word Stream Active...'}
         </div>
       )}
     </section>
@@ -212,6 +225,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: '8px',
     fontSize: '0.75rem',
     color: 'var(--text-muted)',
+    gap: '8px',
+    flexWrap: 'wrap',
   },
   throttleAlert: {
     color: 'var(--danger)',

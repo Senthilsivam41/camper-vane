@@ -13,8 +13,8 @@ export function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const authStatus = params.get('auth');
-    if (authStatus === 'success') {
+    const authQuery = params.get('auth');
+    if (authQuery === 'success') {
       window.history.replaceState({}, '', window.location.pathname);
     }
 

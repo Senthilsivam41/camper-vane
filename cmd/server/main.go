@@ -29,6 +29,8 @@ func main() {
 	authHandler := api.NewAuthHandler(store, oauth)
 	userHandler := api.NewUserHandler(store)
 	chatHandler := api.NewChatStreamHandler(store, store, routerEngine)
+	sessionHandler := api.NewSessionHandler(store)
+	usageHandler := api.NewUsageHandler(store)
 
 	mux := http.NewServeMux()
 
@@ -38,6 +40,9 @@ func main() {
 	mux.HandleFunc("/api/v1/auth/logout", authHandler.HandleLogout)
 
 	mux.HandleFunc("/api/v1/user/config", authHandler.RequireAuth(userHandler.HandleUserConfig))
+	mux.HandleFunc("/api/v1/user/usage", authHandler.RequireAuth(usageHandler.HandleUsage))
+	mux.HandleFunc("/api/v1/sessions", authHandler.RequireAuth(sessionHandler.HandleSessions))
+	mux.HandleFunc("/api/v1/sessions/", authHandler.RequireAuth(sessionHandler.HandleSessions))
 	mux.HandleFunc("/api/v1/chat/stream", authHandler.RequireAuth(chatHandler.HandleStream))
 
 	port := os.Getenv("PORT")

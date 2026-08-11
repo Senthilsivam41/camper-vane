@@ -12,8 +12,15 @@ type MemoryRepo struct {
 	mu       sync.Mutex
 	users    map[string]*UserConfig
 	usage    map[string]int64 // key: userID|date
+	events   []usageEvent
 	sessions map[string][]SessionMessage
 	seq      int64
+}
+
+type usageEvent struct {
+	UserID    string
+	Tokens    int64
+	CreatedAt time.Time
 }
 
 func NewMemoryRepo() *MemoryRepo {
@@ -64,11 +71,24 @@ func (r *MemoryRepo) GetDailyUsage(ctx context.Context, userID string, date time
 	return r.usage[usageKey(userID, date)], nil
 }
 
+func (r *MemoryRepo) GetUsageSince(ctx context.Context, userID string, since time.Time) (int64, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var total int64
+	for _, e := range r.events {
+		if e.UserID == userID && !e.CreatedAt.Before(since) {
+			total += e.Tokens
+		}
+	}
+	return total, nil
+}
+
 func (r *MemoryRepo) IncrementDailyUsage(ctx context.Context, userID string, date time.Time, tokens int64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	key := usageKey(userID, date)
 	r.usage[key] += tokens
+	r.events = append(r.events, usageEvent{UserID: userID, Tokens: tokens, CreatedAt: date.UTC()})
 	return nil
 }
 
@@ -91,10 +111,60 @@ func (r *MemoryRepo) AppendToSession(ctx context.Context, sessionID string, msg 
 	r.seq++
 	msg.SessionID = sessionID
 	if msg.Timestamp.IsZero() {
-		msg.Timestamp = time.Now()
+		msg.Timestamp = time.Now().UTC()
 	}
 	r.sessions[sessionID] = append(r.sessions[sessionID], msg)
 	return nil
+}
+
+func (r *MemoryRepo) ListSessions(ctx context.Context, userID string, limit int) ([]SessionSummary, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if limit <= 0 {
+		limit = 20
+	}
+	type agg struct {
+		summary SessionSummary
+	}
+	byID := map[string]*agg{}
+	order := []string{}
+	for sid, msgs := range r.sessions {
+		for _, m := range msgs {
+			if m.UserID != userID {
+				continue
+			}
+			a, ok := byID[sid]
+			if !ok {
+				a = &agg{summary: SessionSummary{SessionID: sid, Preview: m.Content}}
+				byID[sid] = a
+				order = append(order, sid)
+			}
+			a.summary.MessageCount++
+			if m.Timestamp.After(a.summary.UpdatedAt) {
+				a.summary.UpdatedAt = m.Timestamp
+			}
+		}
+	}
+	// Sort by UpdatedAt desc (simple insertion)
+	for i := 0; i < len(order); i++ {
+		for j := i + 1; j < len(order); j++ {
+			if byID[order[j]].summary.UpdatedAt.After(byID[order[i]].summary.UpdatedAt) {
+				order[i], order[j] = order[j], order[i]
+			}
+		}
+	}
+	if len(order) > limit {
+		order = order[:limit]
+	}
+	out := make([]SessionSummary, 0, len(order))
+	for _, sid := range order {
+		s := byID[sid].summary
+		if len(s.Preview) > 80 {
+			s.Preview = s.Preview[:80] + "…"
+		}
+		out = append(out, s)
+	}
+	return out, nil
 }
 
 func usageKey(userID string, date time.Time) string {
