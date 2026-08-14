@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -46,9 +48,12 @@ func NewHTTPHandler(deps ServerDeps) http.Handler {
 
 // CORSMiddleware enables credentialed cross-origin access when CORS_ALLOWED_ORIGINS is set.
 // Empty/unset → pass-through (same-origin / reverse-proxy recommended).
-// Use "*" only for non-credentialed debugging (credentials will not be enabled for "*").
+// Wildcard "*" is rejected at boot (config error): cookie auth requires exact origins.
 func CORSMiddleware(next http.Handler) http.Handler {
-	allowed := parseCORSOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	allowed, err := parseCORSOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	if err != nil {
+		log.Fatalf("invalid CORS_ALLOWED_ORIGINS: %v", err)
+	}
 	if len(allowed) == 0 {
 		return next
 	}
@@ -56,12 +61,8 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		if origin != "" && originAllowed(allowed, origin) {
-			if origin == "*" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
-			} else {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				w.Header().Set("Access-Control-Allow-Credentials", "true")
-			}
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			w.Header().Set("Access-Control-Expose-Headers", "Content-Type")
@@ -76,25 +77,29 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func parseCORSOrigins(raw string) []string {
+func parseCORSOrigins(raw string) ([]string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil
+		return nil, nil
 	}
 	parts := strings.Split(raw, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
 		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
+		if p == "" {
+			continue
 		}
+		if p == "*" {
+			return nil, fmt.Errorf("wildcard '*' is not allowed; list exact origins only (empty disables CORS)")
+		}
+		out = append(out, p)
 	}
-	return out
+	return out, nil
 }
 
 func originAllowed(allowed []string, origin string) bool {
 	for _, a := range allowed {
-		if a == "*" || strings.EqualFold(a, origin) {
+		if strings.EqualFold(a, origin) {
 			return true
 		}
 	}

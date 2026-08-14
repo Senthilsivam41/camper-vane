@@ -1,11 +1,15 @@
-# Same-origin reverse proxy for Camper Vane (recommended production layout).
+# Same-origin reverse proxy for Camper Vane (bare-metal / VM).
 # UI static files + /api → Go on :8080 so session cookies stay first-party.
+#
+# Docker Compose uses deploy/Caddyfile.docker (upstream host `api:8080`,
+# root /srv). See docs/ops.md “Container deploy”.
 
 camper.example.com {
 	encode gzip
 
 	handle /api/* {
 		reverse_proxy localhost:8080 {
+			# Disable response buffering so chat SSE reaches the browser promptly.
 			flush_interval -1
 		}
 	}

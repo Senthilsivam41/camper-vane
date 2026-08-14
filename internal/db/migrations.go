@@ -4,12 +4,15 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 )
 
 type Migration struct {
 	Version int
 	Name    string
 	SQL     string
+	// Apply runs inside the same transaction after SQL (if any). Optional Go-side steps.
+	Apply func(tx *sql.Tx) error
 }
 
 var migrations = []Migration{
@@ -63,6 +66,12 @@ var migrations = []Migration{
 		CREATE INDEX IF NOT EXISTS idx_session_messages_user ON session_messages(user_id, session_id);
 		`,
 	},
+	{
+		Version: 4,
+		Name:    "backfill_usage_events_and_session_user",
+		// Schema already added in v3; this copies legacy daily_usage / empty session user_ids.
+		Apply: applyV4BackfillSQLite,
+	},
 }
 
 func RunMigrations(db *sql.DB) error {
@@ -94,9 +103,9 @@ func RunMigrations(db *sql.DB) error {
 			return fmt.Errorf("failed to begin tx for migration %d: %w", m.Version, err)
 		}
 
-		if _, err := tx.Exec(m.SQL); err != nil {
+		if err := execMigration(tx, m); err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("failed to execute migration %d (%s): %w", m.Version, m.Name, err)
+			return err
 		}
 
 		if _, err := tx.Exec("INSERT INTO schema_migrations (version, name) VALUES (?, ?)", m.Version, m.Name); err != nil {
@@ -110,5 +119,19 @@ func RunMigrations(db *sql.DB) error {
 		log.Printf("Successfully applied migration %d.", m.Version)
 	}
 
+	return nil
+}
+
+func execMigration(tx *sql.Tx, m Migration) error {
+	if sqlText := strings.TrimSpace(m.SQL); sqlText != "" {
+		if _, err := tx.Exec(sqlText); err != nil {
+			return fmt.Errorf("failed to execute migration %d (%s): %w", m.Version, m.Name, err)
+		}
+	}
+	if m.Apply != nil {
+		if err := m.Apply(tx); err != nil {
+			return fmt.Errorf("failed to apply migration %d (%s): %w", m.Version, m.Name, err)
+		}
+	}
 	return nil
 }
