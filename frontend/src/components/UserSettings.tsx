@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import type { UserConfig } from '../services/api';
 import { fetchUserConfig, updateUserConfig } from '../services/api';
 
-export const UserSettings: React.FC = () => {
+type UserSettingsProps = {
+  onSaved?: () => void;
+};
+
+export const UserSettings: React.FC<UserSettingsProps> = ({ onSaved }) => {
   const [, setConfig] = useState<UserConfig | null>(null);
   const [dailyCap, setDailyCap] = useState<number>(50000);
   const [strategy, setStrategy] = useState<'simple' | 'advanced'>('simple');
@@ -11,7 +15,6 @@ export const UserSettings: React.FC = () => {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
-  const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,15 +47,13 @@ export const UserSettings: React.FC = () => {
     try {
       setSaving(true);
       setErrorMsg(null);
-      setSaveSuccess(false);
       const updated = await updateUserConfig({
         daily_token_cap: Number(dailyCap),
         routing_strategy: strategy,
         preferred_models: preferredModels,
       });
       setConfig(updated);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      onSaved?.();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to update preferences');
     } finally {
@@ -86,11 +87,6 @@ export const UserSettings: React.FC = () => {
       {errorMsg && (
         <div style={styles.errorAlert} role="alert">
           ⚠️ {errorMsg}
-        </div>
-      )}
-      {saveSuccess && (
-        <div style={styles.successBadge} role="status" aria-live="polite">
-          ✓ Preferences updated successfully
         </div>
       )}
 
@@ -272,15 +268,6 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--border-color)',
     borderRadius: '8px',
     cursor: 'pointer',
-  },
-  successBadge: {
-    backgroundColor: 'rgba(74, 222, 128, 0.15)',
-    color: 'var(--success)',
-    border: '1px solid rgba(74, 222, 128, 0.3)',
-    padding: '12px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    fontWeight: 600,
   },
   errorAlert: {
     backgroundColor: 'rgba(248, 113, 113, 0.15)',

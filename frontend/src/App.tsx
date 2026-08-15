@@ -10,6 +10,18 @@ export function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'chat' | 'settings'>('chat');
   const [mockAvailable, setMockAvailable] = useState<boolean>(true);
+  const [flyToast, setFlyToast] = useState<string | null>(null);
+
+  const handleSettingsSaved = () => {
+    setFlyToast('Preferences saved');
+    setActiveTab('chat');
+  };
+
+  useEffect(() => {
+    if (!flyToast) return;
+    const id = window.setTimeout(() => setFlyToast(null), 2800);
+    return () => window.clearTimeout(id);
+  }, [flyToast]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -91,6 +103,11 @@ export function App() {
 
   return (
     <div style={{ backgroundColor: 'var(--bg-app)', minHeight: '100vh', padding: '20px', color: 'var(--text-main)' }}>
+      {flyToast && (
+        <div className="fly-toast" role="status" aria-live="polite">
+          {flyToast}
+        </div>
+      )}
       <header style={styles.header}>
         <div style={{ textAlign: 'center' }}>
           <h1 style={{ color: 'var(--purple)', margin: 0, fontSize: '1.8rem', letterSpacing: '-0.5px' }}>
@@ -195,7 +212,7 @@ export function App() {
             </div>
           ) : (
             <div id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
-              <UserSettings />
+              <UserSettings onSaved={handleSettingsSaved} />
             </div>
           )}
         </main>
