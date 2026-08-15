@@ -5,6 +5,11 @@
 camper_vane.db
 /server
 
+# Local secrets (keep `.env.example` committed; never commit real `.env`)
+.env
+.env.local
+.env.*.local
+
 # Dependency directories
 node_modules/
 dist/

@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -67,5 +68,48 @@ func TestCORSMiddlewarePassThroughWhenUnset(t *testing.T) {
 	}
 	if w.Code != http.StatusTeapot {
 		t.Fatalf("status=%d", w.Code)
+	}
+}
+
+func TestCORSMiddlewareRejectsDisallowedOrigin(t *testing.T) {
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://app.example.com")
+
+	h := CORSMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	if w.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatal("expected no CORS headers for disallowed origin")
+	}
+}
+
+func TestParseCORSOriginsRejectsWildcard(t *testing.T) {
+	cases := []string{"*", "https://app.example.com,*", "*,https://app.example.com"}
+	for _, raw := range cases {
+		_, err := parseCORSOrigins(raw)
+		if err == nil {
+			t.Fatalf("expected error for %q", raw)
+		}
+		if !strings.Contains(err.Error(), "*") {
+			t.Fatalf("error for %q should mention wildcard: %v", raw, err)
+		}
+	}
+}
+
+func TestParseCORSOriginsExactOnly(t *testing.T) {
+	got, err := parseCORSOrigins("http://localhost:5173, https://app.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 || got[0] != "http://localhost:5173" || got[1] != "https://app.example.com" {
+		t.Fatalf("got=%v", got)
+	}
+	empty, err := parseCORSOrigins("")
+	if err != nil || empty != nil {
+		t.Fatalf("empty=%v err=%v", empty, err)
 	}
 }

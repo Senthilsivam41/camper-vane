@@ -1,0 +1,21 @@
+# Docker Compose Caddyfile — same-origin UI + /api proxy with SSE flush.
+# Set CAMPER_SITE_ADDRESS to your public host for automatic HTTPS, e.g.:
+#   CAMPER_SITE_ADDRESS=camper.example.com
+# Default :80 is HTTP-only (local smoke / TLS terminated elsewhere).
+
+{$CAMPER_SITE_ADDRESS::80} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy api:8080 {
+			# Disable response buffering so chat SSE reaches the browser promptly.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

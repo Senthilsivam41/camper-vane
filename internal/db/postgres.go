@@ -268,6 +268,11 @@ func runPostgresMigrations(db *sql.DB) error {
 			CREATE INDEX IF NOT EXISTS idx_session_messages_user ON session_messages(user_id, session_id);
 			`,
 		},
+		{
+			Version: 4,
+			Name:    "backfill_usage_events_and_session_user",
+			Apply:   applyV4BackfillPostgres,
+		},
 	}
 
 	for _, m := range pgMigrations {
@@ -286,9 +291,9 @@ func runPostgresMigrations(db *sql.DB) error {
 			return fmt.Errorf("failed to begin tx for migration %d: %w", m.Version, err)
 		}
 
-		if _, err := tx.Exec(m.SQL); err != nil {
+		if err := execMigration(tx, m); err != nil {
 			_ = tx.Rollback()
-			return fmt.Errorf("failed to execute migration %d (%s): %w", m.Version, m.Name, err)
+			return err
 		}
 		if _, err := tx.Exec("INSERT INTO schema_migrations (version, name) VALUES ($1, $2)", m.Version, m.Name); err != nil {
 			_ = tx.Rollback()

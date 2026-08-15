@@ -1,0 +1,51 @@
+# Camper Vane — smallest useful production-shaped stack
+#   proxy (Caddy) → same-origin / + /api → api (Go) → SQLite volume
+#
+# Setup:
+#   cp .env.example .env   # fill secrets; never commit .env
+#   docker compose up --build
+#
+# Local HTTP (default CAMPER_SITE_ADDRESS=:80): set COOKIE_SECURE=false in .env
+# or open via HTTPS with CAMPER_SITE_ADDRESS=your.domain (Caddy auto HTTPS).
+
+services:
+  api:
+    build:
+      context: .
+      target: api
+    image: camper-vane-api:local
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "8080"
+      # Persist SQLite inside the volume unless DATABASE_URL is set in .env.
+      DATABASE_PATH: /data/camper_vane.db
+      # Safe local defaults when .env is missing; override via .env for real deploys.
+      APP_ENV: ${APP_ENV:-development}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      OAUTH_REDIRECT_URI: ${OAUTH_REDIRECT_URI:-http://localhost/api/v1/auth/callback}
+    volumes:
+      - api-data:/data
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  proxy:
+    build:
+      context: .
+      target: proxy
+    image: camper-vane-proxy:local
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # :80 for local HTTP; set to your hostname for Caddy automatic HTTPS.
+      CAMPER_SITE_ADDRESS: ${CAMPER_SITE_ADDRESS:-:80}
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  api-data:
