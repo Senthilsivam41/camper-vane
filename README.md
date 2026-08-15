@@ -79,7 +79,7 @@ Browser (Vite :5173)
 ```bash
 git clone https://github.com/Senthilsivam41/camper-vane.git
 cd camper-vane
-git checkout feature/epic-4-frontend-presentation
+git checkout main   # or: git checkout v0.1.0
 
 go mod tidy && go test ./...
 go run ./cmd/server/main.go
@@ -89,6 +89,8 @@ npm --prefix frontend run dev
 ```
 
 Open `http://localhost:5173`. Use **Continue with local mock auth** when OAuth client IDs are not set.
+
+Same-origin Docker path: `docker compose up --build` → `http://localhost/`.
 
 See **[quick_start.md](quick_start.md)** and **[docs/ops.md](docs/ops.md)**.
 

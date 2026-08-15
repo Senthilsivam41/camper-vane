@@ -13,6 +13,7 @@ Run the cost-aware LLM gateway locally: Go API on `:8080`, React UI on `:5173` (
 | **npm** | 9+ | Bundled with Node |
 | **Git** | 2.30+ | |
 | **PostgreSQL** *(optional)* | 14+ | Only if using `DATABASE_URL` |
+| **Docker** *(optional)* | 24+ | `docker compose` path below; Compose V2 plugin |
 | **GitHub CLI (`gh`)** *(optional)* | 2+ | Issue/epic automation script |
 
 ---
@@ -60,15 +61,22 @@ Users never enter these in the UI.
 
 ## 3. Install & run
 
+Ship target is **`main`** (tagged [v0.1.0](https://github.com/Senthilsivam41/camper-vane/releases/tag/v0.1.0)). No feature-branch checkout required.
+
 ### Clone
 
 ```bash
 git clone https://github.com/Senthilsivam41/camper-vane.git
 cd camper-vane
-git checkout feature/epic-4-frontend-presentation
+git checkout main   # or: git checkout v0.1.0
 ```
 
-### Backend
+### Option A — Local dev (Vite + Go)
+
+#### Backend
+
+Use **three dots** — `go test ./...` runs every package under this module.  
+(`go test ./..` is wrong: it points at the parent directory and fails with “no Go files”.)
 
 ```bash
 go mod tidy
@@ -78,29 +86,41 @@ go run ./cmd/server/main.go
 
 Server: `http://localhost:8080`.
 
-### Frontend
+#### Frontend
 
 ```bash
 npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
-UI: `http://localhost:5173` (API calls to `/api/*` proxy to `:8080`).
+UI: `http://localhost:5173` (Vite proxies `/api/*` → `:8080`).
 
-Production UI bundle:
+Production UI bundle (for bare-metal / custom reverse proxy):
 
 ```bash
 npm --prefix frontend run build
 ```
 
+### Option B — Docker Compose (same-origin UI + API)
+
+Builds the Go API and a Caddy proxy that serves `frontend/dist` and proxies `/api` (SSE-safe). Cookies stay first-party.
+
+```bash
+cp .env.example .env   # optional; edit secrets for real OAuth / providers
+docker compose up --build
+```
+
+Open `http://localhost/` (UI + `/api` on the same origin).  
+Details / TLS hostname: [`docs/ops.md`](docs/ops.md) § Container deploy.
+
 ### Local happy path (no cloud keys)
 
-1. Start backend + frontend (commands above).
+1. Start **Option A** (backend + frontend) or **Option B** (Compose).
 2. Open the UI → **Continue with local mock auth**.
 3. Send a chat prompt → metrics panel shows negotiated model; stream uses mock provider text.
 4. **Log out** clears the session cookie.
 
-### Production-like start
+### Production-like start (local binary)
 
 ```bash
 export APP_ENV=production
@@ -108,6 +128,8 @@ export JWT_SECRET='replace-with-long-random-secret'
 export COOKIE_SECURE=true
 export ALLOW_MOCK_AUTH=false
 export ALLOW_MOCK_PROVIDERS=false
+export FRONTEND_URL='https://camper.example.com'
+export OAUTH_REDIRECT_URI='https://camper.example.com/api/v1/auth/callback'
 export GOOGLE_CLIENT_ID=...
 export GOOGLE_CLIENT_SECRET=...
 # and/or GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET
@@ -117,6 +139,8 @@ export GEMINI_API_KEY=...
 export PERPLEXITY_API_KEY=...
 go run ./cmd/server/main.go
 ```
+
+Prefer Compose or a reverse proxy so the SPA and `/api` share one origin (leave `CORS_ALLOWED_ORIGINS` empty).
 
 ### PostgreSQL instead of SQLite
 
@@ -238,5 +262,8 @@ Requires `gh auth login` with `repo` scope.
 | Doc | Purpose |
 | :--- | :--- |
 | [README.md](README.md) | Product overview, architecture, story status |
-| [docs/ops.md](docs/ops.md) | Production env matrix, cookies, reverse proxy, CI |
-| [BACKLOG.md](BACKLOG.md) | Prioritized remaining work (P0–P2) |
+| [docs/ops.md](docs/ops.md) | Production env, cookies, reverse proxy, **container deploy**, go-live checklist |
+| [.env.example](.env.example) | Non-secret env template (Compose / production-shaped) |
+| [docker-compose.yml](docker-compose.yml) | Same-origin API + Caddy UI |
+| [BACKLOG.md](BACKLOG.md) | Prioritized remaining work |
+| [Release v0.1.0](https://github.com/Senthilsivam41/camper-vane/releases/tag/v0.1.0) | Current tagged ship |
